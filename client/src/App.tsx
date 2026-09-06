@@ -28,7 +28,7 @@ export const App: React.FC = () => {
   const phase = gameState?.room.phase;
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-[#12141A] text-[#F4EFE6] flex flex-col selection:bg-[#E11D48] selection:text-white">
       {/* Universal Header */}
       <Header
         roomCode={gameState?.room.code}

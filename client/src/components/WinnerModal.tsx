@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import type { WinnerInfo, PublicPlayerInfo } from '../types/game';
-import { Trophy, RotateCcw, LogOut, CheckCircle2, Award } from 'lucide-react';
+import { Trophy, RotateCcw, LogOut, CheckCircle2, Award, Sparkles } from 'lucide-react';
 
 interface WinnerModalProps {
   winner: WinnerInfo | null;
@@ -29,7 +29,7 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   useEffect(() => {
     // Fire celebratory confetti bursts
     const count = 200;
-    const defaults = { origin: { y: 0.7 } };
+    const defaults = { origin: { y: 0.65 } };
 
     function fire(particleRatio: number, opts: confetti.Options) {
       confetti({
@@ -63,46 +63,46 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
     });
   }, [winner]);
 
-  // Rematch status count
+  // Rematch consensus count
   const myRematch = me.rematchRequested;
   const opponentRematch = opponent?.rematchRequested ?? false;
   const rematchCount = (myRematch ? 1 : 0) + (opponentRematch ? 1 : 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-      <div className="bg-[#0E1528] border border-slate-700/80 rounded-3xl max-w-md w-full p-5 sm:p-8 text-center shadow-2xl animate-pop-in relative overflow-hidden max-h-[90vh] overflow-y-auto">
-        {/* Glow ambient */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-amber-500/10 blur-3xl pointer-events-none" />
-
-        {/* Trophy icon */}
-        <div className="relative inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-tr from-amber-500 via-yellow-400 to-amber-600 shadow-[0_0_35px_rgba(245,158,11,0.5)] mb-4 animate-bounce">
-          <Trophy className="w-10 h-10 sm:w-12 sm:h-12 text-slate-950 stroke-[2.5]" />
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-[#1A1D24] border-2 border-[#D97706]/50 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto">
+        {/* Trophy Icon */}
+        <div className="relative inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-3xl bg-gradient-to-b from-[#F59E0B] to-[#D97706] shadow-[0_4px_0_#92400E] mb-4">
+          <Trophy className="w-10 h-10 sm:w-12 sm:h-12 text-[#12141A] stroke-[2.5]" />
         </div>
 
         {/* Title */}
         <div className="space-y-1 mb-4">
-          <span className="text-xs uppercase tracking-widest font-black text-amber-400">
-            {isMeWinner ? 'VICTORY!' : 'GAME OVER'}
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#D97706]/15 border border-[#D97706]/35 text-[#F59E0B] text-xs font-black uppercase tracking-widest">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{isMeWinner ? 'VICTORY!' : 'GAME OVER'}</span>
+          </div>
+
+          <h2 className="text-3xl sm:text-4xl font-black text-[#F4EFE6] tracking-tight">
             {isMeWinner ? 'YOU GOT BINGO!' : `${winner.playerName} WON!`}
           </h2>
-          <p className="text-sm font-medium text-slate-400">
-            Completed <span className="text-amber-300 font-bold">{winner.winningPattern.name}</span>
+
+          <p className="text-sm font-bold text-[#A8A296]">
+            Completed <span className="text-[#F59E0B] font-black">{winner.winningPattern.name}</span>
           </p>
         </div>
 
         {/* Winning Numbers Pill */}
         {winner.winningNumbers && winner.winningNumbers.length > 0 && (
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 mb-6">
-            <span className="text-[11px] font-semibold text-slate-400 block mb-1.5 uppercase tracking-wider">
+          <div className="bg-[#12141A] border border-[#313644] rounded-2xl p-3.5 mb-5">
+            <span className="text-[10px] font-black text-[#A8A296] block mb-1.5 uppercase tracking-widest">
               Winning Line Numbers
             </span>
             <div className="flex items-center justify-center gap-1.5 flex-wrap">
               {winner.winningNumbers.map((num, i) => (
                 <span
                   key={i}
-                  className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-xs flex items-center justify-center"
+                  className="w-9 h-9 rounded-xl bg-[#D97706]/20 border border-[#D97706]/40 text-[#F59E0B] font-black text-xs font-mono flex items-center justify-center shadow-sm"
                 >
                   {num === 0 ? 'FREE' : num}
                 </span>
@@ -112,10 +112,10 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
         )}
 
         {/* Rematch Status Box */}
-        <div className="mb-6 py-2 px-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-medium text-slate-300 flex items-center justify-center gap-2">
-          <Award className="w-4 h-4 text-indigo-400" />
+        <div className="mb-5 py-2 px-3 rounded-xl bg-[#12141A] border border-[#313644] text-xs font-bold text-[#A8A296] flex items-center justify-center gap-2">
+          <Award className="w-4 h-4 text-[#F59E0B]" />
           <span>
-            Rematch votes: <strong className="text-white">{rematchCount}/2</strong> players ready
+            Rematch votes: <strong className="text-[#F4EFE6] font-mono">{rematchCount}/2</strong> players ready
           </span>
         </div>
 
@@ -124,10 +124,10 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
           <button
             onClick={onRequestRematch}
             disabled={myRematch}
-            className={`w-full py-3.5 px-5 rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 shadow-lg transition-all ${
+            className={`w-full py-4 px-5 rounded-2xl font-black text-sm sm:text-base flex items-center justify-center gap-2 transition-all cursor-pointer ${
               myRematch
-                ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 cursor-default'
-                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-indigo-600/30 hover:scale-[1.02] active:scale-[0.98]'
+                ? 'bg-[#059669]/20 text-[#34D399] border border-[#059669]/40 cursor-default'
+                : 'btn-game-emerald'
             }`}
           >
             {myRematch ? (
@@ -138,14 +138,14 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
             ) : (
               <>
                 <RotateCcw className="w-5 h-5" />
-                <span>Play Again</span>
+                <span>PLAY AGAIN</span>
               </>
             )}
           </button>
 
           <button
             onClick={onLeaveRoom}
-            className="w-full py-3 px-5 rounded-2xl font-semibold text-sm text-slate-400 hover:text-white bg-slate-900/60 hover:bg-slate-800 border border-slate-800 transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 px-5 rounded-2xl font-bold text-xs sm:text-sm text-[#A8A296] hover:text-[#F4EFE6] btn-game-neutral flex items-center justify-center gap-2 cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
             <span>Leave Game</span>
@@ -155,3 +155,4 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
     </div>
   );
 };
+

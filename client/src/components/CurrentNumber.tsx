@@ -10,94 +10,106 @@ export const CurrentNumber: React.FC<CurrentNumberProps> = ({ currentNumber, tot
     if (num >= 1 && num <= 15) {
       return {
         letter: 'B',
-        gradient: 'from-pink-500 via-rose-500 to-pink-700',
-        border: 'border-pink-400',
-        glow: 'shadow-[0_0_35px_rgba(236,72,153,0.5)]',
-        badgeBg: 'bg-pink-500/20 text-pink-300 border-pink-500/40',
+        ballBg: 'from-[#E11D48] to-[#9F1239]',
+        ring: 'border-[#FB7185]',
+        badge: 'bg-[#E11D48]/15 text-[#FB7185] border-[#E11D48]/30',
+        capColor: '#E11D48',
       };
     }
     if (num >= 16 && num <= 30) {
       return {
         letter: 'I',
-        gradient: 'from-sky-500 via-cyan-500 to-blue-600',
-        border: 'border-sky-400',
-        glow: 'shadow-[0_0_35px_rgba(56,189,248,0.5)]',
-        badgeBg: 'bg-sky-500/20 text-sky-300 border-sky-500/40',
+        ballBg: 'from-[#D97706] to-[#92400E]',
+        ring: 'border-[#FCD34D]',
+        badge: 'bg-[#D97706]/15 text-[#F59E0B] border-[#D97706]/30',
+        capColor: '#D97706',
       };
     }
     if (num >= 31 && num <= 45) {
       return {
         letter: 'N',
-        gradient: 'from-amber-400 via-amber-500 to-orange-600',
-        border: 'border-amber-300',
-        glow: 'shadow-[0_0_35px_rgba(245,158,11,0.5)]',
-        badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        ballBg: 'from-[#059669] to-[#065F46]',
+        ring: 'border-[#6EE7B7]',
+        badge: 'bg-[#059669]/15 text-[#34D399] border-[#059669]/30',
+        capColor: '#059669',
       };
     }
     if (num >= 46 && num <= 60) {
       return {
         letter: 'G',
-        gradient: 'from-emerald-400 via-emerald-500 to-teal-700',
-        border: 'border-emerald-300',
-        glow: 'shadow-[0_0_35px_rgba(16,185,129,0.5)]',
-        badgeBg: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+        ballBg: 'from-[#EA580C] to-[#9A3412]',
+        ring: 'border-[#FDBA74]',
+        badge: 'bg-[#EA580C]/15 text-[#FB923C] border-[#EA580C]/30',
+        capColor: '#EA580C',
       };
     }
     return {
       letter: 'O',
-      gradient: 'from-purple-500 via-violet-600 to-indigo-700',
-      border: 'border-purple-400',
-      glow: 'shadow-[0_0_35px_rgba(139,92,246,0.5)]',
-      badgeBg: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+      ballBg: 'from-[#7C3AED] to-[#5B21B6]',
+      ring: 'border-[#D8B4FE]',
+      badge: 'bg-[#7C3AED]/15 text-[#C084FC] border-[#7C3AED]/30',
+      capColor: '#7C3AED',
     };
   };
 
   const theme = currentNumber ? getLetterAndTheme(currentNumber) : null;
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-[#0E1526]/80 border border-slate-800 rounded-3xl backdrop-blur-xl shadow-xl">
-      <div className="flex items-center justify-between w-full max-w-xs mb-3">
-        <span className="text-xs uppercase tracking-wider font-extrabold text-slate-400">
-          Current Call
+    <div className="flex flex-col items-center justify-center p-4 sm:p-5 bg-[#1A1D24] border border-[#313644] rounded-3xl shadow-xl relative overflow-hidden">
+      {/* Top Header */}
+      <div className="flex items-center justify-between w-full mb-3">
+        <span className="text-[11px] uppercase tracking-widest font-black text-[#A8A296]">
+          Current Number
         </span>
-        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-          {totalCalled}/75 Called
+        <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-full bg-[#12141A] text-[#F59E0B] border border-[#313644]">
+          {totalCalled}/75 Drawn
         </span>
       </div>
 
-      {currentNumber && theme ? (
-        <div className="flex flex-col items-center">
-          {/* Animated Bingo Ball */}
+      {/* 3D Physical Bingo Ball */}
+      <div className="h-32 flex items-center justify-center">
+        {currentNumber && theme ? (
           <div
             key={currentNumber}
-            className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-gradient-to-br ${theme.gradient} border-4 ${theme.border} ${theme.glow} flex flex-col items-center justify-center animate-ball-drop select-none`}
+            className="relative w-28 h-28 rounded-full bg-gradient-to-b from-[#FFFDF9] via-[#F4EFE6] to-[#D5CDC0] border-2 border-[#E8E2D5] shadow-[0_8px_20px_rgba(0,0,0,0.4)] flex flex-col items-center justify-center animate-ball-pop select-none"
           >
-            {/* Glossy overlay reflection */}
-            <div className="absolute top-2 left-4 w-12 h-6 rounded-full bg-white/30 blur-[2px] transform -rotate-12 pointer-events-none" />
+            {/* Specular Highlight Arc */}
+            <div className="absolute top-2.5 left-4 w-10 h-5 rounded-full bg-white/70 blur-[1px] transform -rotate-15 pointer-events-none" />
 
-            <span className="text-sm font-black text-white/90 tracking-widest uppercase mb-[-2px]">
+            {/* Vintage Color Ring Badge */}
+            <div
+              className={`absolute top-2 px-2.5 py-0.5 rounded-full bg-gradient-to-r ${theme.ballBg} text-white text-[10px] font-black uppercase tracking-wider shadow-sm`}
+            >
               {theme.letter}
-            </span>
-            <span className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">
+            </div>
+
+            {/* Inner Bold Numeral */}
+            <span className="text-4xl font-black tracking-tight leading-none text-[#1A1D24] font-mono mt-3 drop-shadow-sm">
               {currentNumber}
             </span>
           </div>
-
-          <div className="mt-3 flex items-center gap-2">
-            <span
-              className={`text-sm font-bold px-3 py-1 rounded-xl border ${theme.badgeBg}`}
-            >
-              Column {theme.letter} &bull; {currentNumber}
+        ) : (
+          <div className="w-24 h-24 rounded-full bg-[#12141A] border-2 border-dashed border-[#313644] flex flex-col items-center justify-center text-[#A8A296] text-center p-2">
+            <span className="text-[10px] font-black uppercase tracking-wider animate-pulse">
+              Drawing ball...
             </span>
           </div>
-        </div>
-      ) : (
-        <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-slate-900 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500">
-          <span className="text-xs font-bold uppercase tracking-wider animate-pulse text-center px-2">
-            Waiting for next number...
+        )}
+      </div>
+
+      {/* Bottom Column Badge */}
+      <div className="mt-2 flex items-center justify-center">
+        {theme && currentNumber ? (
+          <span className={`text-xs font-black px-3 py-1 rounded-xl border ${theme.badge}`}>
+            Column {theme.letter} &bull; Number {currentNumber}
           </span>
-        </div>
-      )}
+        ) : (
+          <span className="text-xs font-semibold text-[#A8A296]">
+            Auto-called every 4 seconds
+          </span>
+        )}
+      </div>
     </div>
   );
 };
+

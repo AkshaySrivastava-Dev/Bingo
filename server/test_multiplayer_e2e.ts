@@ -301,14 +301,17 @@ async function runE2ETest() {
   clientB.disconnect();
   clientC.disconnect();
   clientAReconnect.disconnect();
+  io.close();
   server.close();
 
   console.log('=============================================');
   console.log('🎉 ALL MULTIPLAYER E2E TEST SCENARIOS PASSED!');
   console.log('=============================================');
+  process.exit(0);
 }
 
 runE2ETest().catch((err) => {
   console.error('❌ E2E TEST FAILED:', err);
   process.exit(1);
 });
+

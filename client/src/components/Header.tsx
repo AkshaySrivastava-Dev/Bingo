@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import type { ConnectionStatus } from '../types/game';
 import { sound } from '../utils/audio';
 import { copyToClipboard } from '../utils/clipboard';
-import { Volume2, VolumeX, Copy, Check, Share2, LogOut, Sparkles } from 'lucide-react';
+import { BingoLogo } from './BingoLogo';
+import { Volume2, VolumeX, Copy, Check, Share2, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   roomCode?: string;
@@ -47,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
     const ok = await copyToClipboard(inviteUrl);
     if (ok) {
       setCopiedLink(true);
-      onShowToast('Invite link copied! Send it to your friend.', 'success');
+      onShowToast('Invite link copied! Share with your friend.', 'success');
       setTimeout(() => setCopiedLink(false), 2000);
     } else {
       onShowToast('Could not copy invite link.', 'error');
@@ -55,53 +56,46 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="w-full bg-[#0E1424]/90 border-b border-slate-800/80 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-4 py-2.5 sm:py-3 transition-colors">
+    <header className="w-full bg-[#161820]/95 border-b border-[#2B303C] backdrop-blur-md sticky top-0 z-40 px-3 sm:px-6 py-2.5 transition-all">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-        {/* Brand / Logo */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-tr from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
-            <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-base sm:text-lg font-black tracking-wider bg-gradient-to-r from-pink-400 via-purple-300 to-indigo-400 bg-clip-text text-transparent">
-                BINGO
-              </span>
-              <span className="hidden xs:inline-block text-[9px] sm:text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                1v1
-              </span>
-            </div>
-          </div>
-        </div>
+        {/* Brand Logo */}
+        <BingoLogo size="sm" showSubtitle={false} />
 
-        {/* Center / Room Details if inside room */}
+        {/* Center: Room Code badge if inside room */}
         {roomCode && (
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="flex items-center bg-slate-900/90 border border-slate-700/80 rounded-xl px-2 sm:px-3 py-1 sm:py-1.5 shadow-sm">
-              <span className="hidden sm:inline text-xs text-slate-400 mr-1.5 font-medium">Room:</span>
-              <span className="font-mono font-bold text-xs sm:text-sm tracking-wider text-indigo-300">
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-[#20242E] border border-[#313745] rounded-xl px-2.5 sm:px-3 py-1 sm:py-1.5 shadow-inner">
+              <span className="hidden sm:inline text-[11px] text-[#A8A296] mr-1.5 font-bold uppercase tracking-wider">
+                Room
+              </span>
+              <span className="font-mono font-black text-xs sm:text-sm tracking-wider text-[#F59E0B]">
                 {roomCode}
               </span>
               <button
                 onClick={handleCopyCode}
-                className="ml-1 sm:ml-2 p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+                className="ml-1.5 p-1 text-[#A8A296] hover:text-[#F4EFE6] rounded-lg hover:bg-[#2B303C] transition-colors"
                 title="Copy Room Code"
+                aria-label="Copy Room Code"
               >
-                {copiedCode ? <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-400" /> : <Copy className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                {copiedCode ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
               </button>
             </div>
 
             <button
               onClick={handleCopyInviteLink}
-              className="hidden sm:flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="hidden sm:flex items-center gap-1.5 bg-[#D97706]/15 hover:bg-[#D97706]/25 text-[#F59E0B] border border-[#D97706]/35 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95"
             >
               {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Share2 className="w-3.5 h-3.5" />}
-              <span>{copiedLink ? 'Copied!' : 'Invite'}</span>
+              <span>{copiedLink ? 'Copied!' : 'Invite Friend'}</span>
             </button>
 
             {round && round > 1 && (
-              <span className="text-[11px] sm:text-xs font-semibold px-2 py-0.5 sm:py-1 rounded-lg bg-purple-500/10 text-purple-300 border border-purple-500/20">
-                R{round}
+              <span className="hidden xs:inline-block text-[11px] font-bold px-2.5 py-1 rounded-lg bg-[#E11D48]/15 text-[#FB7185] border border-[#E11D48]/30">
+                Round {round}
               </span>
             )}
           </div>
@@ -109,20 +103,20 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Connection Status Indicator */}
-          <div className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-lg bg-slate-900/80 border border-slate-800 text-xs font-medium">
+          {/* Connection Status Pill */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#20242E] border border-[#313745] text-xs font-semibold text-[#B8B2A7]">
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 connectionStatus === 'connected'
-                  ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                  ? 'bg-emerald-400'
                   : connectionStatus === 'reconnecting'
                   ? 'bg-amber-400 animate-ping'
                   : 'bg-rose-500'
               }`}
             />
-            <span className="hidden md:inline text-slate-300 capitalize text-[11px]">
+            <span className="hidden md:inline text-[11px] font-medium">
               {connectionStatus === 'connected'
-                ? 'Online'
+                ? 'Connected'
                 : connectionStatus === 'reconnecting'
                 ? 'Reconnecting'
                 : 'Offline'}
@@ -132,18 +126,18 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Sound Mute Toggle */}
           <button
             onClick={handleToggleSound}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white transition-colors"
-            title={isMuted ? 'Unmute Sound' : 'Mute Sound'}
-            aria-label="Toggle Sound"
+            className="p-2 rounded-xl bg-[#20242E] hover:bg-[#2A2F3D] border border-[#313745] text-[#B8B2A7] hover:text-[#F4EFE6] transition-colors"
+            title={isMuted ? 'Unmute Audio' : 'Mute Audio'}
+            aria-label="Toggle Audio"
           >
-            {isMuted ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-indigo-400" />}
+            {isMuted ? <VolumeX className="w-4 h-4 text-[#FB7185]" /> : <Volume2 className="w-4 h-4 text-[#F59E0B]" />}
           </button>
 
-          {/* Leave Room if in room */}
+          {/* Leave Room Button */}
           {onLeaveRoom && roomCode && (
             <button
               onClick={onLeaveRoom}
-              className="p-1.5 sm:p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors"
+              className="p-2 rounded-xl bg-[#E11D48]/10 hover:bg-[#E11D48]/20 border border-[#E11D48]/25 text-[#FB7185] hover:text-white transition-colors"
               title="Leave Room"
               aria-label="Leave Room"
             >
@@ -155,3 +149,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

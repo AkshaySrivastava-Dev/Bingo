@@ -12,11 +12,11 @@ interface BingoBoardProps {
 }
 
 const COLUMNS = [
-  { letter: 'B', range: '1-15', color: 'text-pink-400 bg-pink-500/10 border-pink-500/30' },
-  { letter: 'I', range: '16-30', color: 'text-sky-400 bg-sky-500/10 border-sky-500/30' },
-  { letter: 'N', range: '31-45', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
-  { letter: 'G', range: '46-60', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
-  { letter: 'O', range: '61-75', color: 'text-purple-400 bg-purple-500/10 border-purple-500/30' },
+  { letter: 'B', range: '1–15', color: 'text-[#FB7185] bg-[#E11D48]/15 border-[#E11D48]/30' },
+  { letter: 'I', range: '16–30', color: 'text-[#F59E0B] bg-[#D97706]/15 border-[#D97706]/30' },
+  { letter: 'N', range: '31–45', color: 'text-[#34D399] bg-[#059669]/15 border-[#059669]/30' },
+  { letter: 'G', range: '46–60', color: 'text-[#FB923C] bg-[#EA580C]/15 border-[#EA580C]/30' },
+  { letter: 'O', range: '61–75', color: 'text-[#C084FC] bg-[#7C3AED]/15 border-[#7C3AED]/30' },
 ];
 
 export const BingoBoard: React.FC<BingoBoardProps> = ({
@@ -33,16 +33,16 @@ export const BingoBoard: React.FC<BingoBoardProps> = ({
   };
 
   return (
-    <div className="w-full max-w-md mx-auto bg-[#0E1526]/90 border border-slate-800 rounded-3xl p-3.5 sm:p-5 shadow-2xl backdrop-blur-xl transition-all">
+    <div className="w-full max-w-[460px] mx-auto bg-[#1A1D24] border border-[#313644] rounded-3xl p-3.5 sm:p-5 shadow-xl relative">
       {/* Column Headers B-I-N-G-O */}
-      <div className="grid grid-cols-5 gap-2 sm:gap-3 mb-2 sm:mb-3">
+      <div className="grid grid-cols-5 gap-2 sm:gap-3 mb-2.5 sm:mb-3">
         {COLUMNS.map((col) => (
           <div
             key={col.letter}
-            className={`flex flex-col items-center justify-center py-2 rounded-xl sm:rounded-2xl border font-black shadow-sm ${col.color}`}
+            className={`flex flex-col items-center justify-center py-2 rounded-2xl border font-black shadow-sm select-none ${col.color}`}
           >
-            <span className="text-xl sm:text-2xl tracking-wider leading-none">{col.letter}</span>
-            <span className="text-[10px] sm:text-[11px] font-medium opacity-80 mt-0.5">{col.range}</span>
+            <span className="text-xl sm:text-2xl tracking-wider leading-none font-black">{col.letter}</span>
+            <span className="text-[10px] font-bold opacity-75 mt-0.5">{col.range}</span>
           </div>
         ))}
       </div>
@@ -72,14 +72,15 @@ export const BingoBoard: React.FC<BingoBoardProps> = ({
         )}
       </div>
 
-      {/* Bottom Board Hint */}
+      {/* Bottom Tip */}
       {isGameActive && (
         <div className="mt-3.5 text-center">
-          <p className="text-xs text-slate-400 font-medium">
-            💡 Tap <span className="text-pink-400 font-semibold">flashing cells</span> when your numbers are called!
+          <p className="text-xs text-[#A8A296] font-medium">
+            💡 Tap <span className="text-[#F59E0B] font-bold">amber highlighted cells</span> when your number is drawn!
           </p>
         </div>
       )}
     </div>
   );
 };
+

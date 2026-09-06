@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crown, WifiOff, CheckCircle, Clock } from 'lucide-react';
+import { Crown, WifiOff, CheckCircle2, Clock } from 'lucide-react';
 
 interface PlayerCardProps {
   name: string;
@@ -35,47 +35,47 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
 
   return (
     <div
-      className={`relative flex items-center gap-3 p-3.5 sm:p-4 rounded-2xl border transition-all ${
+      className={`relative flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl border transition-all ${
         isMe
-          ? 'bg-indigo-950/30 border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.15)]'
-          : 'bg-[#0E1526]/80 border-slate-800'
+          ? 'bg-[#222630] border-[#D97706]/40 shadow-lg'
+          : 'bg-[#1A1D24] border-[#313644]'
       }`}
     >
       {/* Avatar */}
       <div className="relative shrink-0">
         <div
-          className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr ${avatarColor} flex items-center justify-center text-white font-black text-base shadow-md`}
+          className={`w-12 h-12 rounded-2xl bg-gradient-to-tr ${avatarColor} flex items-center justify-center text-white font-black text-base shadow-md border border-white/15`}
         >
           {initials}
         </div>
         {/* Connection status indicator dot */}
         <span
-          className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-900 ${
+          className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-[#1A1D24] ${
             isConnected ? 'bg-emerald-400' : 'bg-rose-500'
           }`}
           title={isConnected ? 'Connected' : 'Disconnected'}
         />
       </div>
 
-      {/* Info & Progress */}
+      {/* Info & Live Progress */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-1">
-          <span className="font-bold text-sm sm:text-base text-slate-100 truncate">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="font-black text-sm sm:text-base text-[#F4EFE6] truncate">
             {name}
           </span>
           {isMe && (
-            <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+            <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-[#D97706]/20 text-[#F59E0B] border border-[#D97706]/35 uppercase tracking-widest">
               YOU
             </span>
           )}
           {isHost && (
-            <span className="flex items-center gap-0.5 text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-              <Crown className="w-2.5 h-2.5" />
+            <span className="flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.2 rounded-md bg-[#E11D48]/20 text-[#FB7185] border border-[#E11D48]/30 uppercase tracking-widest">
+              <Crown className="w-2.5 h-2.5 fill-[#FB7185]" />
               HOST
             </span>
           )}
           {completedLines > 0 && isPlaying && (
-            <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-[#059669]/20 text-[#34D399] border border-[#059669]/30 uppercase tracking-wider">
               {completedLines} {completedLines === 1 ? 'Line' : 'Lines'}
             </span>
           )}
@@ -84,12 +84,16 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
         {isPlaying ? (
           /* Live Game Progress Bar */
           <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs font-semibold">
-              <span className="text-slate-400 text-[11px]">Best Line:</span>
-              <span className="text-indigo-300 font-mono text-[11px]">{bestLineCount}/5</span>
+            <div className="flex items-center justify-between text-xs font-bold">
+              <span className="text-[#A8A296] text-[10px] uppercase tracking-wider">
+                Progress
+              </span>
+              <span className="text-[#F59E0B] font-mono text-[11px] font-black">
+                {bestLineCount}/5 {bestLineCount === 4 ? '🔥 BINGO MATCH!' : ''}
+              </span>
             </div>
             {/* 5-segment Progress bar */}
-            <div className="grid grid-cols-5 gap-1 h-2 bg-slate-900 rounded-full p-0.5 border border-slate-800">
+            <div className="grid grid-cols-5 gap-1.5 h-2.5 bg-[#12141A] rounded-full p-0.5 border border-[#2B303C]">
               {[1, 2, 3, 4, 5].map((segment) => {
                 const filled = segment <= bestLineCount;
                 return (
@@ -98,9 +102,9 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                     className={`rounded-full transition-all duration-300 ${
                       filled
                         ? segment === 5
-                          ? 'bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]'
-                          : 'bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.5)]'
-                        : 'bg-slate-800'
+                          ? 'bg-[#E11D48]'
+                          : 'bg-[#F59E0B]'
+                        : 'bg-[#222630]'
                     }`}
                   />
                 );
@@ -109,19 +113,19 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           </div>
         ) : (
           /* Lobby Ready / Waiting status */
-          <div className="flex items-center gap-1.5 text-xs font-medium">
+          <div className="flex items-center gap-2 text-xs font-bold">
             {isReady ? (
               <span className="flex items-center gap-1 text-emerald-400">
-                <CheckCircle className="w-3.5 h-3.5" /> Ready
+                <CheckCircle2 className="w-4 h-4" /> Ready to Play
               </span>
             ) : (
-              <span className="flex items-center gap-1 text-slate-400">
-                <Clock className="w-3.5 h-3.5" /> Not Ready
+              <span className="flex items-center gap-1 text-[#A8A296]">
+                <Clock className="w-4 h-4 text-[#F59E0B]" /> Not Ready
               </span>
             )}
             {!isConnected && (
               <span className="flex items-center gap-1 text-rose-400 text-[11px]">
-                <WifiOff className="w-3 h-3" /> Offline
+                <WifiOff className="w-3.5 h-3.5" /> Disconnected
               </span>
             )}
           </div>
@@ -130,3 +134,4 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
     </div>
   );
 };
+

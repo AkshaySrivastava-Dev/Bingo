@@ -13,6 +13,7 @@ import {
   Clock,
   Sparkles,
   ShieldCheck,
+  Swords,
 } from 'lucide-react';
 
 interface LobbyProps {
@@ -58,71 +59,77 @@ export const Lobby: React.FC<LobbyProps> = ({
     }
   };
 
-  // Determine Start button disabled reason
+  // Start button disabled status message
   let startDisabledReason = '';
   if (!isBothPresent) {
-    startDisabledReason = 'Waiting for friend to join...';
+    startDisabledReason = 'Waiting for your friend to join...';
   } else if (!isBothReady) {
-    startDisabledReason = 'Both players must click Ready';
+    startDisabledReason = 'Both players must click Ready to start';
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-5 sm:py-6 space-y-5 sm:space-y-6">
-      {/* Top Banner: Room Code & Share Invite */}
-      <div className="bg-gradient-to-r from-indigo-950/70 via-slate-900/80 to-purple-950/70 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="text-center md:text-left space-y-1 w-full md:w-auto">
-          <span className="text-xs font-black uppercase tracking-widest text-indigo-400">
-            Private Game Lobby
-          </span>
-          <div className="flex items-center justify-center md:justify-start gap-2">
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wider font-mono">
-              {room.code}
-            </h2>
+    <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      {/* Top Arena Banner */}
+      <div className="bg-[#1A1D24] border border-[#313644] rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="text-center md:text-left space-y-1">
+            <span className="text-[11px] font-black uppercase tracking-widest text-[#F59E0B] flex items-center justify-center md:justify-start gap-1.5">
+              <Swords className="w-3.5 h-3.5" />
+              Game Lobby
+            </span>
+            <div className="flex items-center justify-center md:justify-start gap-2.5">
+              <span className="text-xs text-[#A8A296] font-bold uppercase tracking-wider">
+                Room Code:
+              </span>
+              <span className="text-3xl font-black font-mono tracking-widest text-[#F59E0B]">
+                {room.code}
+              </span>
+              <button
+                onClick={handleCopyCode}
+                className="p-1.5 rounded-xl bg-[#12141A] hover:bg-[#2B303C] border border-[#313644] text-[#B8B2A7] hover:text-[#F4EFE6] transition-colors"
+                title="Copy Room Code"
+              >
+                {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-[#B8B2A7] font-medium">
+              Share the invite link with your friend to connect instantly.
+            </p>
+          </div>
+
+          {/* Share Action */}
+          <div className="w-full md:w-auto">
             <button
-              onClick={handleCopyCode}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
-              title="Copy Room Code"
+              onClick={handleCopyLink}
+              className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl btn-game-amber text-sm font-black cursor-pointer"
             >
-              {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              {copiedLink ? <Check className="w-4 h-4 text-[#12141A]" /> : <Share2 className="w-4 h-4" />}
+              <span>{copiedLink ? 'Invite Link Copied!' : 'Copy Invite Link'}</span>
             </button>
           </div>
-          <p className="text-xs text-slate-400 font-medium">
-            Share this code or invite link with your friend to play.
-          </p>
-        </div>
-
-        {/* Share Buttons */}
-        <div className="flex items-center gap-2.5 w-full md:w-auto">
-          <button
-            onClick={handleCopyLink}
-            className="w-full md:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            {copiedLink ? <Check className="w-4 h-4 text-emerald-300" /> : <Share2 className="w-4 h-4" />}
-            <span>{copiedLink ? 'Invite Link Copied!' : 'Copy Invite Link'}</span>
-          </button>
         </div>
       </div>
 
-      {/* Main Grid: Left is Players & Controls, Right is Board Preview */}
+      {/* Main Grid: Left is Players Arena, Right is Lucky Board Preview */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Side: Players & Ready Status (7 cols) */}
+        {/* Left Side: Players & Ready Matchup (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
-          <div className="bg-[#0E1526]/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl backdrop-blur-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-                <span>Players in Room</span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
-                  {isBothPresent ? '2/2' : '1/2'}
+          <div className="bg-[#1A1D24] border border-[#313644] rounded-3xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#2B303C] pb-3">
+              <h3 className="text-sm font-black uppercase tracking-wider text-[#F4EFE6] flex items-center gap-2">
+                <span>Player Matchup</span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-[#12141A] border border-[#313644] text-[#A8A296]">
+                  {isBothPresent ? '2/2 Ready' : '1/2 Waiting'}
                 </span>
               </h3>
-              <span className="text-xs font-medium text-slate-400">
-                {isBothReady ? 'Both Ready!' : isBothPresent ? 'Waiting for Ready...' : 'Waiting for Player 2'}
+              <span className="text-xs font-bold text-[#F59E0B]">
+                {isBothReady ? '🔥 Ready to Start!' : isBothPresent ? 'Waiting for Ready' : 'Waiting for Opponent'}
               </span>
             </div>
 
-            {/* Players list */}
+            {/* Players VS Arena */}
             <div className="space-y-3">
-              {/* My Player Card */}
+              {/* Player 1: Me */}
               <PlayerCard
                 name={me.name}
                 avatarColor={me.avatarColor}
@@ -135,7 +142,17 @@ export const Lobby: React.FC<LobbyProps> = ({
                 phase={room.phase}
               />
 
-              {/* Opponent Card or Waiting Placeholder */}
+              {/* VS Divider Badge */}
+              <div className="relative flex items-center justify-center py-1">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-[#2B303C]" />
+                </div>
+                <div className="relative px-3 py-1 bg-[#12141A] border border-[#313644] rounded-full text-[10px] font-black tracking-widest text-[#B8B2A7] uppercase shadow">
+                  VS
+                </div>
+              </div>
+
+              {/* Player 2: Opponent or Waiting Box */}
               {opponent ? (
                 <PlayerCard
                   name={opponent.name}
@@ -149,66 +166,66 @@ export const Lobby: React.FC<LobbyProps> = ({
                   phase={room.phase}
                 />
               ) : (
-                <div className="p-5 rounded-2xl border-2 border-dashed border-slate-800 bg-slate-900/40 flex flex-col items-center justify-center text-center gap-2 animate-pulse-subtle">
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-indigo-400">
-                    <UserPlus className="w-5 h-5" />
+                <div className="p-6 rounded-2xl border-2 border-dashed border-[#313644] bg-[#12141A]/60 flex flex-col items-center justify-center text-center gap-2">
+                  <div className="w-12 h-12 rounded-2xl bg-[#D97706]/15 border border-[#D97706]/30 flex items-center justify-center text-[#F59E0B]">
+                    <UserPlus className="w-6 h-6" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-300">Waiting for your friend to join...</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">Send them the invite link to join this room.</p>
+                    <h4 className="text-sm font-black text-[#F4EFE6]">Waiting for friend to join...</h4>
+                    <p className="text-xs text-[#A8A296] mt-0.5">Send them the invite link to start playing.</p>
                   </div>
                   <button
                     onClick={handleCopyLink}
-                    className="mt-1 text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                    className="mt-2 text-xs font-black text-[#F59E0B] hover:underline underline-offset-4 cursor-pointer"
                   >
-                    + Copy Link
+                    + Copy Invite Link
                   </button>
                 </div>
               )}
             </div>
 
             {/* Ready Toggle Button */}
-            <div className="pt-2 border-t border-slate-800/80">
+            <div className="pt-2 border-t border-[#2B303C]">
               <button
                 onClick={() => onSetReady(!me.isReady)}
-                className={`w-full py-3 px-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md ${
+                className={`w-full py-3.5 px-4 rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer ${
                   me.isReady
-                    ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/30'
-                    : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                    ? 'btn-game-emerald'
+                    : 'btn-game-neutral'
                 }`}
               >
                 {me.isReady ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>You are READY! (Click to cancel)</span>
+                    <CheckCircle2 className="w-5 h-5 text-emerald-100" />
+                    <span>YOU ARE READY! (Click to cancel)</span>
                   </>
                 ) : (
                   <>
-                    <Clock className="w-4 h-4 text-amber-400" />
-                    <span>I'm Ready! Click here</span>
+                    <Clock className="w-5 h-5 text-[#F59E0B]" />
+                    <span>I'M READY — CLICK HERE</span>
                   </>
                 )}
               </button>
             </div>
 
-            {/* Host Start Game Controls */}
+            {/* Host Start Game Action */}
             {me.isHost && (
               <div className="pt-2 space-y-2">
                 <button
                   onClick={onStartCountdown}
                   disabled={!isBothReady}
-                  className={`w-full py-4 px-6 rounded-2xl font-black text-base flex items-center justify-center gap-2.5 transition-all shadow-xl ${
+                  className={`w-full py-4 px-6 rounded-2xl font-black text-base flex items-center justify-center gap-2.5 transition-all ${
                     isBothReady
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98]'
-                      : 'bg-slate-900 text-slate-500 border border-slate-800 cursor-not-allowed'
+                      ? 'btn-game-emerald shadow-lg cursor-pointer'
+                      : 'bg-[#12141A] text-[#666B7A] border border-[#2B303C] cursor-not-allowed opacity-60'
                   }`}
                 >
                   <Play className="w-5 h-5 fill-current" />
-                  <span>Start Game</span>
+                  <span>START GAME NOW</span>
                 </button>
 
                 {!isBothReady && (
-                  <p className="text-center text-xs font-semibold text-amber-400/90">
+                  <p className="text-center text-xs font-bold text-[#F59E0B]">
                     ⚠️ {startDisabledReason}
                   </p>
                 )}
@@ -217,38 +234,34 @@ export const Lobby: React.FC<LobbyProps> = ({
 
             {!me.isHost && (
               <div className="pt-2 text-center">
-                <p className="text-xs text-slate-400 font-medium">
+                <p className="text-xs text-[#B8B2A7] font-medium">
                   {isBothReady
                     ? 'Waiting for Host to press Start Game...'
-                    : 'Get ready so the Host can start the game!'}
+                    : 'Mark yourself Ready so the Host can start!'}
                 </p>
               </div>
             )}
           </div>
 
-          {/* Fair Play & Rules summary */}
-          <div className="bg-[#0E1526]/60 border border-slate-800/80 rounded-2xl p-4 text-xs text-slate-400 space-y-1.5">
-            <div className="flex items-center gap-1.5 font-bold text-slate-300">
-              <ShieldCheck className="w-4 h-4 text-indigo-400" />
-              <span>Standard 5x5 Bingo Rules</span>
+          {/* Rules Card */}
+          <div className="bg-[#1A1D24]/70 border border-[#2B303C] rounded-2xl p-4 text-xs text-[#A8A296] space-y-1">
+            <div className="flex items-center gap-1.5 font-bold text-[#F4EFE6]">
+              <ShieldCheck className="w-4 h-4 text-[#F59E0B]" />
+              <span>Official 5x5 Bingo Rules</span>
             </div>
-            <p>
-              &bull; Numbers 1-75 are automatically called every 4 seconds.
-            </p>
-            <p>
-              &bull; Complete any 5-in-a-row (Horizontal, Vertical, or Diagonal) to achieve BINGO!
-            </p>
+            <p>&bull; Numbers 1–75 are called automatically every 4 seconds.</p>
+            <p>&bull; The first player to complete any 5-in-a-row (Row, Column, or Diagonal) wins BINGO!</p>
           </div>
         </div>
 
-        {/* Right Side: Your Randomized Lucky Board Preview (5 cols) */}
+        {/* Right Side: Pre-game Lucky Board Preview (5 cols) */}
         <div className="lg:col-span-5 flex flex-col items-center">
           <div className="w-full flex items-center justify-between mb-2 px-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              Your Game Board Preview
+            <span className="text-xs font-black uppercase tracking-wider text-[#F4EFE6] flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#F59E0B]" />
+              Your Lucky Board Preview
             </span>
-            <span className="text-[11px] text-slate-500 font-medium">Pre-generated</span>
+            <span className="text-[11px] font-bold text-[#A8A296]">Pre-generated</span>
           </div>
 
           <BingoBoard
@@ -264,3 +277,4 @@ export const Lobby: React.FC<LobbyProps> = ({
     </div>
   );
 };
+
