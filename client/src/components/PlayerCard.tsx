@@ -1,5 +1,6 @@
 import React from 'react';
-import { Crown, WifiOff, CheckCircle2, Clock } from 'lucide-react';
+import { Crown, WifiOff, CheckCircle2, Clock, Sparkles } from 'lucide-react';
+import type { TurnState } from '../types/game';
 
 interface PlayerCardProps {
   name: string;
@@ -11,6 +12,9 @@ interface PlayerCardProps {
   completedLines: number;
   isMe?: boolean;
   phase: string;
+  isPlayerTurn?: boolean;
+  turnState?: TurnState;
+  isPendingResponder?: boolean;
 }
 
 export const PlayerCard: React.FC<PlayerCardProps> = ({
@@ -23,6 +27,9 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   completedLines,
   isMe = false,
   phase,
+  isPlayerTurn = false,
+  turnState,
+  isPendingResponder = false,
 }) => {
   const initials = name
     .split(' ')
@@ -36,7 +43,9 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   return (
     <div
       className={`relative flex items-center gap-3.5 p-3.5 sm:p-4 rounded-2xl border transition-all ${
-        isMe
+        isPlayerTurn && isPlaying
+          ? 'bg-[#222630] border-[#F59E0B] shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+          : isMe
           ? 'bg-[#222630] border-[#D97706]/40 shadow-lg'
           : 'bg-[#1A1D24] border-[#313644]'
       }`}
@@ -59,7 +68,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
 
       {/* Info & Live Progress */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 mb-1.5">
+        <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
           <span className="font-black text-sm sm:text-base text-[#F4EFE6] truncate">
             {name}
           </span>
@@ -74,9 +83,15 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
               HOST
             </span>
           )}
+          {isPlaying && isPlayerTurn && (
+            <span className="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.2 rounded-md bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40 uppercase tracking-widest animate-pulse">
+              <Sparkles className="w-2.5 h-2.5" />
+              {turnState === 'SELECTING' ? 'PICKING' : isPendingResponder ? 'STAMPING' : 'ACTIVE'}
+            </span>
+          )}
           {completedLines > 0 && isPlaying && (
             <span className="text-[9px] font-black px-1.5 py-0.2 rounded-md bg-[#059669]/20 text-[#34D399] border border-[#059669]/30 uppercase tracking-wider">
-              {completedLines} {completedLines === 1 ? 'Line' : 'Lines'}
+              BINGO!
             </span>
           )}
         </div>
@@ -86,13 +101,13 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs font-bold">
               <span className="text-[#A8A296] text-[10px] uppercase tracking-wider">
-                Progress
+                Line Progress
               </span>
               <span className="text-[#F59E0B] font-mono text-[11px] font-black">
-                {bestLineCount}/5 {bestLineCount === 4 ? '🔥 BINGO MATCH!' : ''}
+                {bestLineCount}/5 {bestLineCount === 4 ? '🔥 1 AWAY!' : bestLineCount === 5 ? '🏆 BINGO!' : ''}
               </span>
             </div>
-            {/* 5-segment Progress bar */}
+            {/* 5-segment Progress bar toward 1 Line Bingo */}
             <div className="grid grid-cols-5 gap-1.5 h-2.5 bg-[#12141A] rounded-full p-0.5 border border-[#2B303C]">
               {[1, 2, 3, 4, 5].map((segment) => {
                 const filled = segment <= bestLineCount;
@@ -102,7 +117,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
                     className={`rounded-full transition-all duration-300 ${
                       filled
                         ? segment === 5
-                          ? 'bg-[#E11D48]'
+                          ? 'bg-[#059669]'
                           : 'bg-[#F59E0B]'
                         : 'bg-[#222630]'
                     }`}

@@ -1,11 +1,26 @@
 import React from 'react';
+import type { PendingNumber, MoveRecord, TurnState } from '../types/game';
+import { Radio, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 
 interface CurrentNumberProps {
-  currentNumber: number | null;
-  totalCalled: number;
+  pendingNumber: PendingNumber | null;
+  lastMove: MoveRecord | null;
+  turnState: TurnState;
+  activePlayerName: string;
+  isMyTurn: boolean;
+  isPendingResponder: boolean;
+  totalCalls: number;
 }
 
-export const CurrentNumber: React.FC<CurrentNumberProps> = ({ currentNumber, totalCalled }) => {
+export const CurrentNumber: React.FC<CurrentNumberProps> = ({
+  pendingNumber,
+  lastMove,
+  turnState: _turnState,
+  activePlayerName,
+  isMyTurn,
+  isPendingResponder,
+  totalCalls,
+}) => {
   const getLetterAndTheme = (num: number) => {
     if (num >= 1 && num <= 15) {
       return {
@@ -52,25 +67,34 @@ export const CurrentNumber: React.FC<CurrentNumberProps> = ({ currentNumber, tot
     };
   };
 
-  const theme = currentNumber ? getLetterAndTheme(currentNumber) : null;
+  const activeNum = pendingNumber?.number ?? lastMove?.number ?? null;
+  const theme = activeNum ? getLetterAndTheme(activeNum) : null;
 
   return (
     <div className="flex flex-col items-center justify-center p-4 sm:p-5 bg-[#1A1D24] border border-[#313644] rounded-3xl shadow-xl relative overflow-hidden">
       {/* Top Header */}
       <div className="flex items-center justify-between w-full mb-3">
-        <span className="text-[11px] uppercase tracking-widest font-black text-[#A8A296]">
-          Current Number
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] uppercase tracking-widest font-black text-[#A8A296]">
+            {pendingNumber ? 'Pending Selection' : 'Latest Move'}
+          </span>
+          {pendingNumber && (
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#F59E0B] opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#F59E0B]"></span>
+            </span>
+          )}
+        </div>
         <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-full bg-[#12141A] text-[#F59E0B] border border-[#313644]">
-          {totalCalled}/75 Drawn
+          {totalCalls} Moves
         </span>
       </div>
 
       {/* 3D Physical Bingo Ball */}
       <div className="h-32 flex items-center justify-center">
-        {currentNumber && theme ? (
+        {activeNum && theme ? (
           <div
-            key={currentNumber}
+            key={activeNum}
             className="relative w-28 h-28 rounded-full bg-gradient-to-b from-[#FFFDF9] via-[#F4EFE6] to-[#D5CDC0] border-2 border-[#E8E2D5] shadow-[0_8px_20px_rgba(0,0,0,0.4)] flex flex-col items-center justify-center animate-ball-pop select-none"
           >
             {/* Specular Highlight Arc */}
@@ -85,27 +109,56 @@ export const CurrentNumber: React.FC<CurrentNumberProps> = ({ currentNumber, tot
 
             {/* Inner Bold Numeral */}
             <span className="text-4xl font-black tracking-tight leading-none text-[#1A1D24] font-mono mt-3 drop-shadow-sm">
-              {currentNumber}
+              {activeNum}
             </span>
           </div>
         ) : (
           <div className="w-24 h-24 rounded-full bg-[#12141A] border-2 border-dashed border-[#313644] flex flex-col items-center justify-center text-[#A8A296] text-center p-2">
-            <span className="text-[10px] font-black uppercase tracking-wider animate-pulse">
-              Drawing ball...
+            <Radio className="w-5 h-5 text-[#F59E0B] mb-1 animate-pulse" />
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              {isMyTurn ? 'Your Pick' : 'Awaiting Pick'}
             </span>
           </div>
         )}
       </div>
 
-      {/* Bottom Column Badge */}
-      <div className="mt-2 flex items-center justify-center">
-        {theme && currentNumber ? (
-          <span className={`text-xs font-black px-3 py-1 rounded-xl border ${theme.badge}`}>
-            Column {theme.letter} &bull; Number {currentNumber}
-          </span>
+      {/* Status & Subtitle Info */}
+      <div className="mt-2 flex flex-col items-center justify-center text-center space-y-1">
+        {pendingNumber ? (
+          <>
+            <div className="flex items-center gap-1 text-xs font-black text-[#F4EFE6]">
+              <span>{pendingNumber.selectedByName} called</span>
+              <span className="text-[#F59E0B] font-mono">{theme?.letter} {pendingNumber.number}</span>
+            </div>
+            {isPendingResponder ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-full bg-[#D97706]/20 text-[#F59E0B] border border-[#D97706]/40 animate-pulse">
+                <Sparkles className="w-3 h-3" /> Found on your board! STAMP IT
+              </span>
+            ) : isMyTurn ? (
+              <span className="text-[11px] font-semibold text-[#A8A296]">
+                Waiting for opponent to check...
+              </span>
+            ) : null}
+          </>
+        ) : lastMove ? (
+          <>
+            <div className="flex items-center gap-1 text-xs font-bold text-[#A8A296]">
+              <span>{lastMove.selectedByName} picked</span>
+              <span className="text-[#F4EFE6] font-mono font-black">{lastMove.number}</span>
+            </div>
+            {lastMove.hasMatch ? (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Matched & stamped on opponent board
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#A8A296]">
+                <XCircle className="w-3.5 h-3.5 text-rose-400/80" /> Not on opponent board
+              </span>
+            )}
+          </>
         ) : (
           <span className="text-xs font-semibold text-[#A8A296]">
-            Auto-called every 4 seconds
+            {isMyTurn ? '🎯 Select any number on your board to start' : `⏳ ${activePlayerName} is choosing a number`}
           </span>
         )}
       </div>

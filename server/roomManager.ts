@@ -6,15 +6,17 @@ import {
   ClientGameState,
   PublicPlayerInfo,
   WinnerInfo,
-  WinningPattern,
+  MoveRecord,
+  PendingNumber,
 } from './types.js';
 import {
   generateBingoBoard,
   createInitialMarkedGrid,
-  shuffleNumberPool,
   calculateProgress,
   checkBingo,
   getWinningNumbers,
+  getNumberLetter,
+  findNumberOnBoard,
 } from './gameEngine.js';
 import { Server } from 'socket.io';
 
@@ -29,7 +31,6 @@ const AVATAR_COLORS = [
 
 export class RoomManager {
   private rooms: Map<string, RoomState> = new Map();
-  private timers: Map<string, NodeJS.Timeout> = new Map();
   private countdownTimers: Map<string, NodeJS.Timeout> = new Map();
   private io: Server;
 
@@ -97,9 +98,12 @@ export class RoomManager {
       code,
       phase: 'WAITING_FOR_PLAYER',
       players: [hostPlayer],
-      calledNumbers: [],
-      currentNumber: null,
-      numberPool: shuffleNumberPool(),
+      activePlayerId: null,
+      turnState: 'SELECTING',
+      pendingNumber: null,
+      lastSelectedNumber: null,
+      playHistory: [],
+      allSelectedNumbers: [],
       countdown: 3,
       winner: null,
       round: 1,
@@ -265,71 +269,152 @@ export class RoomManager {
     if (!room) return;
 
     room.phase = 'PLAYING';
-    room.numberPool = shuffleNumberPool();
-    room.calledNumbers = [];
-    room.currentNumber = null;
+    const hostPlayer = room.players.find((p) => p.isHost) || room.players[0];
+    room.activePlayerId = hostPlayer.id; // Host gets the first turn to choose
+    room.turnState = 'SELECTING';
+    room.pendingNumber = null;
+    room.lastSelectedNumber = null;
+    room.playHistory = [];
+    room.allSelectedNumbers = [];
     room.winner = null;
     room.lastActivityAt = Date.now();
 
     this.broadcastRoomUpdate(room);
-
-    // Call first number after a short 1 second delay
-    setTimeout(() => {
-      this.callNextNumber(roomId);
-    }, 1000);
-
-    // Set recurring 4-second automatic call timer
-    if (this.timers.has(roomId)) {
-      clearInterval(this.timers.get(roomId)!);
-    }
-
-    const callInterval = setInterval(() => {
-      this.callNextNumber(roomId);
-    }, 4000);
-
-    this.timers.set(roomId, callInterval);
-  }
-
-  private callNextNumber(roomId: string): void {
-    const room = this.rooms.get(roomId);
-    if (!room || room.phase !== 'PLAYING') {
-      if (this.timers.has(roomId)) {
-        clearInterval(this.timers.get(roomId)!);
-        this.timers.delete(roomId);
-      }
-      return;
-    }
-
-    if (room.numberPool.length === 0) {
-      // All numbers called
-      this.stopCallingTimer(roomId);
-      return;
-    }
-
-    const nextNumber = room.numberPool.pop()!;
-    room.calledNumbers.push(nextNumber);
-    room.currentNumber = nextNumber;
-    room.lastActivityAt = Date.now();
-
-    this.io.to(roomId).emit('number_called', {
-      number: nextNumber,
-      totalCalled: room.calledNumbers.length,
-      history: room.calledNumbers,
-    });
   }
 
   public stopCallingTimer(roomId: string): void {
-    if (this.timers.has(roomId)) {
-      clearInterval(this.timers.get(roomId)!);
-      this.timers.delete(roomId);
-    }
     if (this.countdownTimers.has(roomId)) {
       clearInterval(this.countdownTimers.get(roomId)!);
       this.countdownTimers.delete(roomId);
     }
   }
 
-  public markCell(
+  /**
+   * Action 1: Active player selects an unmarked number from their own board.
+   */
+  public selectNumber(
+    roomId: string,
+    sessionToken: string,
+    row: number,
+    col: number,
+    value: number
+  ): {
+    success: boolean;
+    hasMatch?: boolean;
+    pendingNumber?: PendingNumber | null;
+    nextPlayerId?: string;
+    errorCode?: string;
+    errorMessage?: string;
+  } {
+    const room = this.rooms.get(roomId);
+    if (!room) {
+      return { success: false, errorCode: 'ROOM_NOT_FOUND', errorMessage: 'Room not found.' };
+    }
+
+    if (room.phase !== 'PLAYING') {
+      return { success: false, errorCode: 'GAME_OVER', errorMessage: 'Game is not in PLAYING phase.' };
+    }
+
+    const player = room.players.find((p) => p.sessionToken === sessionToken);
+    if (!player) {
+      return { success: false, errorCode: 'INVALID_SESSION', errorMessage: 'Invalid player session.' };
+    }
+
+    if (room.turnState !== 'SELECTING' || room.activePlayerId !== player.id) {
+      return { success: false, errorCode: 'NOT_YOUR_TURN', errorMessage: 'It is not your turn to choose a number.' };
+    }
+
+    if (row < 0 || row > 4 || col < 0 || col > 4) {
+      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'Cell coordinates out of bounds.' };
+    }
+
+    if (player.board[row][col] !== value) {
+      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'Cell value does not match board.' };
+    }
+
+    if (value === 0) {
+      return { success: false, errorCode: 'INVALID_SELECTION', errorMessage: 'Cannot select the FREE space.' };
+    }
+
+    if (player.markedCells[row][col]) {
+      return { success: false, errorCode: 'CELL_ALREADY_MARKED', errorMessage: 'Cannot select an already marked number.' };
+    }
+
+    if (room.allSelectedNumbers.includes(value)) {
+      return { success: false, errorCode: 'NUMBER_ALREADY_SELECTED', errorMessage: 'This number was already chosen earlier.' };
+    }
+
+    const opponent = room.players.find((p) => p.id !== player.id);
+    if (!opponent) {
+      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'Waiting for opponent.' };
+    }
+
+    // Add to selected numbers tracker
+    room.allSelectedNumbers.push(value);
+    const letter = getNumberLetter(value);
+
+    // Check if opponent has this number on their board
+    const opponentMatch = findNumberOnBoard(opponent.board, value);
+    const hasMatch = opponentMatch !== null && !opponent.markedCells[opponentMatch.row][opponentMatch.col];
+
+    room.lastSelectedNumber = {
+      number: value,
+      letter,
+      selectedBy: player.id,
+      selectedByName: player.name,
+    };
+    room.lastActivityAt = Date.now();
+
+    if (hasMatch) {
+      // Opponent HAS the number -> Must respond and mark it
+      const pending: PendingNumber = {
+        number: value,
+        letter,
+        selectedBy: player.id,
+        selectedByName: player.name,
+        responderId: opponent.id,
+      };
+      room.pendingNumber = pending;
+      room.turnState = 'WAITING_FOR_RESPONSE';
+
+      this.broadcastRoomUpdate(room);
+
+      return {
+        success: true,
+        hasMatch: true,
+        pendingNumber: pending,
+      };
+    } else {
+      // Opponent DOES NOT HAVE the number -> Record move as No Match & Pass turn to opponent directly
+      const moveRecord: MoveRecord = {
+        number: value,
+        letter,
+        selectedBy: player.id,
+        selectedByName: player.name,
+        hasMatch: false,
+        markedByOpponent: false,
+        timestamp: Date.now(),
+      };
+      room.playHistory.push(moveRecord);
+
+      room.pendingNumber = null;
+      room.activePlayerId = opponent.id;
+      room.turnState = 'SELECTING';
+
+      this.broadcastRoomUpdate(room);
+
+      return {
+        success: true,
+        hasMatch: false,
+        nextPlayerId: opponent.id,
+      };
+    }
+  }
+
+  /**
+   * Action 2: Opponent responds to the pending selection by marking the matching number on their board.
+   */
+  public markSelectedNumber(
     roomId: string,
     sessionToken: string,
     row: number,
@@ -351,7 +436,7 @@ export class RoomManager {
     }
 
     if (room.phase !== 'PLAYING') {
-      return { success: false, errorCode: 'GAME_OVER', errorMessage: 'Cannot mark cell: Game is not in PLAYING phase.' };
+      return { success: false, errorCode: 'GAME_OVER', errorMessage: 'Game is not in PLAYING phase.' };
     }
 
     const player = room.players.find((p) => p.sessionToken === sessionToken);
@@ -359,24 +444,27 @@ export class RoomManager {
       return { success: false, errorCode: 'INVALID_SESSION', errorMessage: 'Invalid player session.' };
     }
 
-    if (row < 0 || row > 4 || col < 0 || col > 4) {
-      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'Cell coordinate out of bounds.' };
+    if (room.turnState !== 'WAITING_FOR_RESPONSE' || !room.pendingNumber) {
+      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'No pending number to respond to.' };
     }
 
-    if (player.board[row][col] !== value) {
-      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'Cell value does not match board.' };
+    if (room.pendingNumber.responderId !== player.id) {
+      return { success: false, errorCode: 'NOT_PENDING_RESPONDER', errorMessage: 'Only the opponent can mark the selected number.' };
+    }
+
+    if (row < 0 || row > 4 || col < 0 || col > 4) {
+      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'Cell coordinates out of bounds.' };
+    }
+
+    if (player.board[row][col] !== value || value !== room.pendingNumber.number) {
+      return { success: false, errorCode: 'INVALID_MOVE', errorMessage: 'You can only mark the exact number selected by your opponent.' };
     }
 
     if (player.markedCells[row][col]) {
       return { success: false, errorCode: 'CELL_ALREADY_MARKED', errorMessage: 'This cell is already marked.' };
     }
 
-    // Value must be 0 (FREE) or in calledNumbers
-    if (value !== 0 && !room.calledNumbers.includes(value)) {
-      return { success: false, errorCode: 'NUMBER_NOT_CALLED', errorMessage: 'This number has not been called yet.' };
-    }
-
-    // Mark cell
+    // Mark responder's cell
     player.markedCells[row][col] = true;
     player.lastActiveAt = Date.now();
     room.lastActivityAt = Date.now();
@@ -386,13 +474,26 @@ export class RoomManager {
     player.bestLineCount = bestLineCount;
     player.completedLines = completedLines;
 
-    // Check for Bingo win
+    // Record completed move in history
+    const moveRecord: MoveRecord = {
+      number: room.pendingNumber.number,
+      letter: room.pendingNumber.letter,
+      selectedBy: room.pendingNumber.selectedBy,
+      selectedByName: room.pendingNumber.selectedByName,
+      hasMatch: true,
+      markedByOpponent: true,
+      timestamp: Date.now(),
+    };
+    room.playHistory.push(moveRecord);
+
+    // Check for 1-line Bingo on responder's board
     const winningPattern = checkBingo(player.markedCells);
 
     if (winningPattern && !room.winner) {
-      // We have a winner!
+      // Responder achieved BINGO!
       player.hasBingo = true;
       room.phase = 'GAME_OVER';
+      room.pendingNumber = null;
 
       const winningNumbers = getWinningNumbers(player.board, winningPattern);
       const winnerInfo: WinnerInfo = {
@@ -403,9 +504,6 @@ export class RoomManager {
       };
 
       room.winner = winnerInfo;
-      this.stopCallingTimer(roomId);
-
-      // Broadcast game_over to all players
       this.broadcastRoomUpdate(room);
 
       return {
@@ -418,8 +516,12 @@ export class RoomManager {
       };
     }
 
-    // Broadcast updated progress to other players in the room
-    this.broadcastProgressUpdate(room, player);
+    // If no Bingo, turn now passes to the responder to SELECT their number
+    room.activePlayerId = player.id;
+    room.turnState = 'SELECTING';
+    room.pendingNumber = null;
+
+    this.broadcastRoomUpdate(room);
 
     return {
       success: true,
@@ -465,9 +567,12 @@ export class RoomManager {
     this.stopCallingTimer(room.id);
 
     room.phase = 'LOBBY';
-    room.calledNumbers = [];
-    room.currentNumber = null;
-    room.numberPool = shuffleNumberPool();
+    room.activePlayerId = null;
+    room.turnState = 'SELECTING';
+    room.pendingNumber = null;
+    room.lastSelectedNumber = null;
+    room.playHistory = [];
+    room.allSelectedNumbers = [];
     room.winner = null;
     room.round++;
     room.countdown = 3;
@@ -540,8 +645,11 @@ export class RoomManager {
       this.stopCallingTimer(roomId);
       room.phase = 'WAITING_FOR_PLAYER';
       room.winner = null;
-      room.calledNumbers = [];
-      room.currentNumber = null;
+      room.activePlayerId = null;
+      room.pendingNumber = null;
+      room.lastSelectedNumber = null;
+      room.playHistory = [];
+      room.allSelectedNumbers = [];
     } else if (room.phase === 'LOBBY') {
       room.phase = 'WAITING_FOR_PLAYER';
     }
@@ -570,6 +678,9 @@ export class RoomManager {
         }
       : null;
 
+    const isMyTurn = room.phase === 'PLAYING' && room.activePlayerId === me.id && room.turnState === 'SELECTING';
+    const isPendingResponder = room.phase === 'PLAYING' && room.turnState === 'WAITING_FOR_RESPONSE' && room.pendingNumber?.responderId === me.id;
+
     return {
       room: {
         id: room.id,
@@ -577,9 +688,14 @@ export class RoomManager {
         phase: room.phase,
         round: room.round,
         countdown: room.countdown,
-        calledNumbers: room.calledNumbers,
-        currentNumber: room.currentNumber,
-        totalCalled: room.calledNumbers.length,
+        activePlayerId: room.activePlayerId,
+        turnState: room.turnState,
+        pendingNumber: room.pendingNumber,
+        lastSelectedNumber: room.lastSelectedNumber,
+        playHistory: room.playHistory,
+        allSelectedNumbers: room.allSelectedNumbers,
+        isMyTurn,
+        isPendingResponder,
         winner: room.winner,
       },
       me: {
@@ -612,17 +728,6 @@ export class RoomManager {
     }
   }
 
-  public broadcastProgressUpdate(room: RoomState, updatedPlayer: PlayerState): void {
-    for (const player of room.players) {
-      if (player.sessionToken !== updatedPlayer.sessionToken && player.socketId) {
-        this.io.to(player.socketId).emit('opponent_progress_update', {
-          bestLineCount: updatedPlayer.bestLineCount,
-          completedLines: updatedPlayer.completedLines,
-        });
-      }
-    }
-  }
-
   private cleanupStaleRooms(): void {
     const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
     for (const [id, room] of this.rooms.entries()) {
@@ -633,3 +738,4 @@ export class RoomManager {
     }
   }
 }
+

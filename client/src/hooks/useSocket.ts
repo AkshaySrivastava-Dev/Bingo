@@ -95,26 +95,6 @@ export function useSocket() {
       });
     });
 
-    // Number called event
-    socket.on(
-      'number_called',
-      (data: { number: number; totalCalled: number; history: number[] }) => {
-        sound.playNumberCalled();
-        setGameState((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            room: {
-              ...prev.room,
-              currentNumber: data.number,
-              calledNumbers: data.history,
-              totalCalled: data.totalCalled,
-            },
-          };
-        });
-      }
-    );
-
     // Countdown tick
     socket.on('countdown_tick', (data: { countdown: number }) => {
       if (data.countdown > 0) {
@@ -133,24 +113,6 @@ export function useSocket() {
         };
       });
     });
-
-    // Opponent progress update
-    socket.on(
-      'opponent_progress_update',
-      (data: { bestLineCount: number; completedLines: number }) => {
-        setGameState((prev) => {
-          if (!prev || !prev.opponent) return prev;
-          return {
-            ...prev,
-            opponent: {
-              ...prev.opponent,
-              bestLineCount: data.bestLineCount,
-              completedLines: data.completedLines,
-            },
-          };
-        });
-      }
-    );
 
     // Player status update (e.g. opponent disconnect)
     socket.on(
@@ -296,13 +258,49 @@ export function useSocket() {
     );
   }, [gameState, addToast]);
 
-  const markCell = useCallback(
+  // Turn Action 1: Select a number on your turn
+  const selectNumber = useCallback(
     (row: number, col: number, value: number) => {
       if (!socketRef.current || !gameState) return;
       if (gameState.room.phase !== 'PLAYING') return;
 
       socketRef.current.emit(
-        'mark_cell',
+        'select_number',
+        {
+          roomId: gameState.room.id,
+          sessionToken: gameState.me.sessionToken,
+          row,
+          col,
+          value,
+        },
+        (res: { success: boolean; hasMatch?: boolean; code?: string; message?: string }) => {
+          if (res.success) {
+            sound.playNumberCalled();
+            if (res.hasMatch) {
+              addToast(`You selected ${value}! Waiting for opponent to check...`, 'info');
+            } else {
+              addToast(`You selected ${value}. Opponent does not have it! Turn passed.`, 'info');
+            }
+          } else {
+            sound.playError();
+            if (res.message) {
+              addToast(res.message, 'warning');
+            }
+          }
+        }
+      );
+    },
+    [gameState, addToast]
+  );
+
+  // Turn Action 2: Opponent responds to the selected number
+  const markSelectedNumber = useCallback(
+    (row: number, col: number, value: number) => {
+      if (!socketRef.current || !gameState) return;
+      if (gameState.room.phase !== 'PLAYING') return;
+
+      socketRef.current.emit(
+        'mark_selected_number',
         {
           roomId: gameState.room.id,
           sessionToken: gameState.me.sessionToken,
@@ -334,6 +332,7 @@ export function useSocket() {
                 },
               };
             });
+            addToast(`Stamped ${value}! Now it's your turn to choose.`, 'success');
           } else {
             sound.playError();
             if (res.message) {
@@ -344,6 +343,20 @@ export function useSocket() {
       );
     },
     [gameState, addToast]
+  );
+
+  // Smart cell handler that automatically picks between selectNumber and markSelectedNumber
+  const markCell = useCallback(
+    (row: number, col: number, value: number) => {
+      if (!gameState || gameState.room.phase !== 'PLAYING') return;
+
+      if (gameState.room.isPendingResponder && gameState.room.turnState === 'WAITING_FOR_RESPONSE') {
+        markSelectedNumber(row, col, value);
+      } else if (gameState.room.isMyTurn && gameState.room.turnState === 'SELECTING') {
+        selectNumber(row, col, value);
+      }
+    },
+    [gameState, markSelectedNumber, selectNumber]
   );
 
   const requestRematch = useCallback(() => {
@@ -400,8 +413,11 @@ export function useSocket() {
     joinRoom,
     setReady,
     startCountdown,
+    selectNumber,
+    markSelectedNumber,
     markCell,
     requestRematch,
     leaveRoom,
   };
 }
+

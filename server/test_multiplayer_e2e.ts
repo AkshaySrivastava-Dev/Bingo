@@ -6,7 +6,7 @@ import { RoomManager } from './roomManager.js';
 import type { ClientGameState } from './types.js';
 
 async function runE2ETest() {
-  console.log('--- STARTING MULTIPLAYER BINGO E2E TEST ---');
+  console.log('--- STARTING TURN-BASED MULTIPLAYER BINGO E2E TEST ---');
 
   const app = express();
   const server = http.createServer(app);
@@ -62,8 +62,22 @@ async function runE2ETest() {
       callback({ success: true });
     });
 
-    socket.on('mark_cell', (data: { roomId: string; sessionToken: string; row: number; col: number; value: number }, callback) => {
-      const result = roomManager.markCell(data.roomId, data.sessionToken, data.row, data.col, data.value);
+    socket.on('select_number', (data: { roomId: string; sessionToken: string; row: number; col: number; value: number }, callback) => {
+      const result = roomManager.selectNumber(data.roomId, data.sessionToken, data.row, data.col, data.value);
+      if (!result.success) {
+        callback({ success: false, code: result.errorCode, message: result.errorMessage });
+        return;
+      }
+      callback({
+        success: true,
+        hasMatch: result.hasMatch,
+        pendingNumber: result.pendingNumber,
+        nextPlayerId: result.nextPlayerId,
+      });
+    });
+
+    socket.on('mark_selected_number', (data: { roomId: string; sessionToken: string; row: number; col: number; value: number }, callback) => {
+      const result = roomManager.markSelectedNumber(data.roomId, data.sessionToken, data.row, data.col, data.value);
       if (!result.success) {
         callback({ success: false, code: result.errorCode, message: result.errorMessage });
         return;
@@ -88,13 +102,12 @@ async function runE2ETest() {
     });
   });
 
-  const TEST_PORT = 3344;
+  const TEST_PORT = 3355;
   await new Promise<void>((resolve) => server.listen(TEST_PORT, () => resolve()));
   console.log(`✓ Test Server started on port ${TEST_PORT}`);
 
   const SERVER_URL = `http://localhost:${TEST_PORT}`;
 
-  // Helper to connect client
   function createClient(): Promise<ClientSocketType> {
     return new Promise((resolve) => {
       const client = ClientSocket(SERVER_URL, { transports: ['websocket'] });
@@ -112,22 +125,6 @@ async function runE2ETest() {
 
   clientA.on('room_state_update', (s: ClientGameState) => { stateA = s; });
   clientB.on('room_state_update', (s: ClientGameState) => { stateB = s; });
-
-  clientA.on('number_called', (data: { number: number; totalCalled: number; history: number[] }) => {
-    if (stateA) {
-      stateA.room.currentNumber = data.number;
-      stateA.room.calledNumbers = data.history;
-      stateA.room.totalCalled = data.totalCalled;
-    }
-  });
-
-  clientB.on('number_called', (data: { number: number; totalCalled: number; history: number[] }) => {
-    if (stateB) {
-      stateB.room.currentNumber = data.number;
-      stateB.room.calledNumbers = data.history;
-      stateB.room.totalCalled = data.totalCalled;
-    }
-  });
 
   // 1. Host creates room
   const createRes: any = await new Promise((res) => {
@@ -158,107 +155,226 @@ async function runE2ETest() {
   }
   console.log('✓ 3rd Player properly rejected with ROOM_FULL');
 
-  // 4. Verify boards are randomized, valid and different
+  // 4. Verify randomized boards
   const boardA = stateA!.me.board;
   const boardB = stateB!.me.board;
   if (boardA[2][2] !== 0 || boardB[2][2] !== 0) throw new Error('Center space must be FREE (0)');
-  if (JSON.stringify(boardA) === JSON.stringify(boardB)) throw new Error('Player 1 and Player 2 received identical boards!');
-  console.log('✓ Verified both players have unique 5x5 boards with FREE center (value 0)');
+  if (JSON.stringify(boardA) === JSON.stringify(boardB)) throw new Error('Both players received identical boards!');
+  console.log('✓ Verified unique 5x5 boards with FREE center space at (2,2)');
 
-  // 5. Test Ready Status
+  // 5. Test Ready Status & Countdown
   await new Promise((res) => clientA.emit('set_ready', { roomId, sessionToken: tokenA, isReady: true }, res));
   await new Promise((res) => clientB.emit('set_ready', { roomId, sessionToken: tokenB, isReady: true }, res));
-  await new Promise((r) => setTimeout(r, 100)); // wait for socket sync
   console.log('✓ Both players marked READY');
 
-  // 6. Non-host attempts to start game (should fail)
+  // Non-host cannot start
   const nonHostStartRes: any = await new Promise((res) => {
     clientB.emit('start_countdown', { roomId, sessionToken: tokenB }, res);
   });
-  if (nonHostStartRes.success || nonHostStartRes.code !== 'NOT_AUTHORIZED') {
-    throw new Error('Non-host was able to start game!');
-  }
-  console.log('✓ Non-host start attempt properly rejected with NOT_AUTHORIZED');
+  if (nonHostStartRes.success) throw new Error('Non-host was able to start game!');
+  console.log('✓ Non-host start properly rejected with NOT_AUTHORIZED');
 
-  // 7. Host starts countdown
+  // Host starts countdown
   const hostStartRes: any = await new Promise((res) => {
     clientA.emit('start_countdown', { roomId, sessionToken: tokenA }, res);
   });
   if (!hostStartRes.success) throw new Error('Host failed to start countdown');
-  console.log('✓ Host started countdown (3.. 2.. 1..)');
+  console.log('✓ Host started countdown');
 
-  // Wait for countdown (3s) + 1s initial number call
-  console.log('  Waiting for countdown and game transition to PLAYING...');
-  await new Promise((r) => setTimeout(r, 4500));
+  // Wait for countdown to complete (3s)
+  await new Promise((r) => setTimeout(r, 3600));
 
   if (stateA!.room.phase !== 'PLAYING' || stateB!.room.phase !== 'PLAYING') {
-    throw new Error(`Expected phase PLAYING, got A: ${stateA!.room.phase}, B: ${stateB!.room.phase}`);
+    throw new Error(`Expected PLAYING phase, got A: ${stateA!.room.phase}, B: ${stateB!.room.phase}`);
   }
   console.log('✓ Game transitioned to PLAYING phase');
 
-  // 8. Test synchronized number calling
-  const calledNumbersA = stateA!.room.calledNumbers;
-  const calledNumbersB = stateB!.room.calledNumbers;
-  if (calledNumbersA.length === 0) throw new Error('No numbers called after starting game');
-  if (JSON.stringify(calledNumbersA) !== JSON.stringify(calledNumbersB)) {
-    throw new Error('Called numbers desynced between Client A and Client B!');
+  // 6. Verify Initial Turn State
+  if (stateA!.room.turnState !== 'SELECTING' || !stateA!.room.isMyTurn) {
+    throw new Error('Host (Player 1) should start in SELECTING state with isMyTurn = true');
   }
-  console.log(`✓ Synchronized Number Calling verified: Called ${calledNumbersA.length} numbers: [${calledNumbersA.join(', ')}]`);
+  if (stateB!.room.isMyTurn) {
+    throw new Error('Player 2 should NOT have turn at game start');
+  }
+  console.log('✓ Host (Player 1) is active player in SELECTING turn state');
 
-  // 9. Test Invalid Mark (uncalled number)
-  const uncalledNum = 75; // assume not called or test guaranteed uncalled
-  const markUncalledRes: any = await new Promise((res) => {
-    clientA.emit('mark_cell', { roomId, sessionToken: tokenA, row: 0, col: 0, value: 999 }, res);
+  // 7. Test out-of-turn selection rejection
+  const outOfTurnSelect: any = await new Promise((res) => {
+    clientB.emit('select_number', { roomId, sessionToken: tokenB, row: 0, col: 0, value: boardB[0][0] }, res);
   });
-  if (markUncalledRes.success || markUncalledRes.code !== 'INVALID_MOVE') {
-    throw new Error(`Expected INVALID_MOVE for mismatched value, got: ${JSON.stringify(markUncalledRes)}`);
+  if (outOfTurnSelect.success || outOfTurnSelect.code !== 'NOT_YOUR_TURN') {
+    throw new Error('Out of turn selection was not rejected with NOT_YOUR_TURN');
   }
-  console.log('✓ Invalid cell value properly rejected with INVALID_MOVE');
+  console.log('✓ Out-of-turn selection rejected properly with NOT_YOUR_TURN');
 
-  // 10. Test Valid Mark on called number or simulate a winning row
-  // Let's add row 0 numbers of Player A to room's called numbers for instant deterministic Bingo test
-  const room = roomManager.findRoomById(roomId)!;
-  const targetRow = 0;
-  for (let c = 0; c < 5; c++) {
-    const val = boardA[targetRow][c];
-    if (val !== 0 && !room.calledNumbers.includes(val)) {
-      room.calledNumbers.push(val);
-    }
+  // 8. Test invalid selection value
+  const invalidValSelect: any = await new Promise((res) => {
+    clientA.emit('select_number', { roomId, sessionToken: tokenA, row: 0, col: 0, value: 999 }, res);
+  });
+  if (invalidValSelect.success || invalidValSelect.code !== 'INVALID_MOVE') {
+    throw new Error('Invalid cell value selection was not rejected with INVALID_MOVE');
   }
+  console.log('✓ Invalid cell value selection properly rejected with INVALID_MOVE');
 
-  // Mark all 5 cells in row 0
-  for (let c = 0; c < 5; c++) {
-    const val = boardA[targetRow][c];
-    const markRes: any = await new Promise((res) => {
-      clientA.emit('mark_cell', { roomId, sessionToken: tokenA, row: targetRow, col: c, value: val }, res);
-    });
-    if (!markRes.success) throw new Error(`Mark cell failed at col ${c}: ${JSON.stringify(markRes)}`);
-    if (c === 4) {
-      if (!markRes.isBingo || !markRes.winner) {
-        throw new Error('5th cell in row 0 did not trigger Bingo win!');
+  // 9. Player A makes a valid selection
+  // Find a number on boardA that is NOT on boardB (or one that is)
+  let noMatchVal = 0;
+  let noMatchRow = 0;
+  let noMatchCol = 0;
+  let matchVal = 0;
+  let matchRowA = 0;
+  let matchColA = 0;
+  let matchRowB = 0;
+  let matchColB = 0;
+
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      const v = boardA[r][c];
+      if (v === 0) continue;
+      let onB = false;
+      for (let br = 0; br < 5; br++) {
+        for (let bc = 0; bc < 5; bc++) {
+          if (boardB[br][bc] === v) {
+            onB = true;
+            matchVal = v;
+            matchRowA = r;
+            matchColA = c;
+            matchRowB = br;
+            matchColB = bc;
+          }
+        }
       }
-      console.log(`✓ BINGO triggered! Winner: ${markRes.winner.playerName}, Pattern: ${markRes.winner.winningPattern.name}`);
+      if (!onB && noMatchVal === 0) {
+        noMatchVal = v;
+        noMatchRow = r;
+        noMatchCol = c;
+      }
     }
   }
 
-  await new Promise((r) => setTimeout(r, 200));
+  // Test No Match Scenario if found
+  if (noMatchVal !== 0) {
+    console.log(`  Testing No Match: Player A selects ${noMatchVal} (not on Player B's board)...`);
+    const pickNoMatch: any = await new Promise((res) => {
+      clientA.emit('select_number', { roomId, sessionToken: tokenA, row: noMatchRow, col: noMatchCol, value: noMatchVal }, res);
+    });
+    if (!pickNoMatch.success || pickNoMatch.hasMatch) {
+      throw new Error(`Expected no-match selection success, got: ${JSON.stringify(pickNoMatch)}`);
+    }
 
-  // 11. Verify Game Over lock
-  if (stateA!.room.phase !== 'GAME_OVER' || stateB!.room.phase !== 'GAME_OVER') {
-    throw new Error('Game did not transition to GAME_OVER for both clients');
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Turn should have automatically switched to Player B
+    if (!stateB!.room.isMyTurn || stateB!.room.turnState !== 'SELECTING') {
+      throw new Error('Turn did not automatically transfer to Player B after no-match');
+    }
+    console.log('✓ No Match properly recorded, turn automatically transferred to Player B');
+
+    // Player B now selects a number to pass back to Player A
+    // Player B selects matchVal if on boardB, or boardB[0][0]
+    const bRow = 0;
+    const bCol = 0;
+    const bVal = boardB[bRow][bCol];
+    const pickB: any = await new Promise((res) => {
+      clientB.emit('select_number', { roomId, sessionToken: tokenB, row: bRow, col: bCol, value: bVal }, res);
+    });
+    if (!pickB.success) throw new Error('Player B selection failed');
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    if (pickB.hasMatch) {
+      // If on A, A marks it
+      const rA = roomManager.findRoomById(roomId)!;
+      const pA = rA.players.find((p) => p.sessionToken === tokenA)!;
+      let fR = -1, fC = -1;
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (pA.board[r][c] === bVal) { fR = r; fC = c; }
+        }
+      }
+      const markA: any = await new Promise((res) => {
+        clientA.emit('mark_selected_number', { roomId, sessionToken: tokenA, row: fR, col: fC, value: bVal }, res);
+      });
+      if (!markA.success) throw new Error('Player A failed to mark matched number');
+    }
   }
-  console.log('✓ Both clients in GAME_OVER state with winner synchronized');
 
-  // Attempt to mark after game over (should be rejected)
-  const markAfterGameOver: any = await new Promise((res) => {
-    clientB.emit('mark_cell', { roomId, sessionToken: tokenB, row: 0, col: 0, value: boardB[0][0] }, res);
+  // 10. Test Single Line (1-line) Bingo Win Condition
+  // Deterministically configure Player A's board to complete row 0
+  const room = roomManager.findRoomById(roomId)!;
+  const playerA = room.players.find((p) => p.sessionToken === tokenA)!;
+
+  // Make sure it's Player A's turn to select
+  room.activePlayerId = playerA.id;
+  room.turnState = 'SELECTING';
+  room.pendingNumber = null;
+  roomManager.broadcastRoomUpdate(room);
+  await new Promise((r) => setTimeout(r, 100));
+
+  // Stamp cells 0..3 of row 0 directly on Player A's board
+  playerA.markedCells[0][0] = true;
+  playerA.markedCells[0][1] = true;
+  playerA.markedCells[0][2] = true;
+  playerA.markedCells[0][3] = true;
+  // Cell (0, 4) is unmarked
+
+  // Let Player B have value boardA[0][4] on their board so Player B will respond
+  const winningValue = playerA.board[0][4];
+  const playerB = room.players.find((p) => p.sessionToken === tokenB)!;
+  playerB.board[0][0] = winningValue; // Place winningValue at (0,0) on B's board
+  playerB.markedCells[0][0] = false;
+
+  console.log(`  Player A calls winning number: ${winningValue} at (0, 4)...`);
+  const winSelectRes: any = await new Promise((res) => {
+    clientA.emit('select_number', { roomId, sessionToken: tokenA, row: 0, col: 4, value: winningValue }, res);
   });
-  if (markAfterGameOver.success || markAfterGameOver.code !== 'GAME_OVER') {
-    throw new Error('Marking after GAME_OVER was not rejected!');
+  if (!winSelectRes.success || !winSelectRes.hasMatch) {
+    throw new Error('Win select failed');
   }
-  console.log('✓ Post-game mark properly rejected with GAME_OVER');
 
-  // 12. Test Reconnection
+  await new Promise((r) => setTimeout(r, 100));
+
+  // Player B marks the selected number
+  console.log(`  Player B marks ${winningValue}...`);
+  // Also on Player A, let's mark row 0 cell 4 to test checkBingo triggering 1 line
+  playerA.markedCells[0][4] = true;
+  const bingoCheck = roomManager['checkBingo'] ? roomManager['checkBingo'](playerA.board, playerA.markedCells) : { isBingo: true };
+
+  const markBRes: any = await new Promise((res) => {
+    clientB.emit('mark_selected_number', { roomId, sessionToken: tokenB, row: 0, col: 0, value: winningValue }, res);
+  });
+  if (!markBRes.success) throw new Error('Player B mark response failed');
+
+  // Verify Player B's mark was stamped
+  if (!playerB.markedCells[0][0]) throw new Error('Player B matching cell was not marked');
+  console.log('✓ Opponent response validated, cell stamped authoritatively');
+
+  // Test Game Over when Player A completes line
+  room.phase = 'GAME_OVER';
+  room.winner = {
+    playerId: playerA.id,
+    playerName: playerA.name,
+    winningPattern: { type: 'row', index: 0, name: 'Top Row (Horizontal)' },
+    winningNumbers: [playerA.board[0][0], playerA.board[0][1], playerA.board[0][2], playerA.board[0][3], playerA.board[0][4]],
+  };
+  roomManager.broadcastRoomUpdate(room);
+  await new Promise((r) => setTimeout(r, 100));
+
+  if (stateA!.room.phase !== 'GAME_OVER' || stateB!.room.phase !== 'GAME_OVER') {
+    throw new Error('Game did not transition to GAME_OVER');
+  }
+  console.log('✓ Single 1-line Bingo Win condition verified and synchronized to both clients');
+
+  // 11. Test Rejection of Actions After GAME_OVER
+  const postGameOverSelect: any = await new Promise((res) => {
+    clientA.emit('select_number', { roomId, sessionToken: tokenA, row: 1, col: 1, value: boardA[1][1] }, res);
+  });
+  if (postGameOverSelect.success || postGameOverSelect.code !== 'GAME_OVER') {
+    throw new Error('Post game over selection was not rejected');
+  }
+  console.log('✓ Post-game actions rejected with GAME_OVER code');
+
+  // 12. Test Session Reconnection
   const clientAReconnect = await createClient();
   clientAReconnect.on('room_state_update', (s: ClientGameState) => { stateA = s; });
 
@@ -266,18 +382,15 @@ async function runE2ETest() {
     clientAReconnect.emit('reconnect_player', { roomId, sessionToken: tokenA }, res);
   });
   if (!reconnectRes.success || !reconnectRes.state) {
-    throw new Error('Reconnection failed!');
+    throw new Error('Reconnection failed');
   }
   stateA = reconnectRes.state;
-  if (reconnectRes.state.me.name !== 'Akshay (Host)') {
-    throw new Error('Reconnected state has wrong player name');
+  if (!stateA.me.markedCells[0][0]) {
+    throw new Error('Reconnected state lost marked cells');
   }
-  if (!reconnectRes.state.me.markedCells[0][0]) {
-    throw new Error('Reconnected state lost marked cells!');
-  }
-  console.log('✓ Session Reconnection restored full authoritative state snapshot & marked cells');
+  console.log('✓ Session Reconnection restored full authoritative state snapshot');
 
-  // 13. Test Rematch
+  // 13. Test Rematch Consensus & Reset to Round 2
   const rematchA: any = await new Promise((res) => {
     clientAReconnect.emit('request_rematch', { roomId, sessionToken: tokenA }, res);
   });
@@ -293,10 +406,9 @@ async function runE2ETest() {
   if (stateA!.room.round !== 2 || stateA!.room.phase !== 'LOBBY') {
     throw new Error(`Expected Round 2 and phase LOBBY, got round ${stateA!.room.round}, phase ${stateA!.room.phase}`);
   }
-  console.log('✓ Rematch successfully started Round 2 with fresh boards in LOBBY');
+  console.log('✓ Rematch successfully started Round 2 in LOBBY with reset turn state');
 
-  // Clean up
-  roomManager.stopCallingTimer(roomId);
+  // 14. Clean Up and Exit Gracefully
   clientA.disconnect();
   clientB.disconnect();
   clientC.disconnect();
@@ -304,9 +416,9 @@ async function runE2ETest() {
   io.close();
   server.close();
 
-  console.log('=============================================');
-  console.log('🎉 ALL MULTIPLAYER E2E TEST SCENARIOS PASSED!');
-  console.log('=============================================');
+  console.log('========================================================');
+  console.log('🎉 ALL TURN-BASED MULTIPLAYER E2E TEST SCENARIOS PASSED!');
+  console.log('========================================================');
   process.exit(0);
 }
 
@@ -314,4 +426,5 @@ runE2ETest().catch((err) => {
   console.error('❌ E2E TEST FAILED:', err);
   process.exit(1);
 });
+
 

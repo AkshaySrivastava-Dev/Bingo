@@ -1,13 +1,23 @@
 import React from 'react';
-import type { BingoBoard as BingoBoardType, MarkedGrid, WinningPattern } from '../types/game';
-import { BingoCell } from './BingoCell';
+import type {
+  BingoBoard as BingoBoardType,
+  MarkedGrid,
+  WinningPattern,
+  TurnState,
+  PendingNumber,
+} from '../types/game';
+import { BingoCell, type CellMode } from './BingoCell';
 
 interface BingoBoardProps {
   board: BingoBoardType;
   markedCells: MarkedGrid;
-  calledNumbers: number[];
   winningPattern?: WinningPattern | null;
   isGameActive: boolean;
+  isMyTurn: boolean;
+  turnState: TurnState;
+  isPendingResponder: boolean;
+  pendingNumber: PendingNumber | null;
+  allSelectedNumbers: number[];
   onCellClick: (row: number, col: number, value: number) => void;
 }
 
@@ -22,9 +32,13 @@ const COLUMNS = [
 export const BingoBoard: React.FC<BingoBoardProps> = ({
   board,
   markedCells,
-  calledNumbers,
   winningPattern,
   isGameActive,
+  isMyTurn,
+  turnState,
+  isPendingResponder,
+  pendingNumber,
+  allSelectedNumbers,
   onCellClick,
 }) => {
   const isWinningCoord = (r: number, c: number): boolean => {
@@ -52,8 +66,30 @@ export const BingoBoard: React.FC<BingoBoardProps> = ({
         {board.map((row, rIdx) =>
           row.map((val, cIdx) => {
             const isMarked = markedCells[rIdx]?.[cIdx] ?? false;
-            const isCalled = val === 0 || calledNumbers.includes(val);
             const isWinning = isWinningCoord(rIdx, cIdx);
+
+            let cellMode: CellMode = 'disabled';
+            if (isWinning) {
+              cellMode = 'winning';
+            } else if (isMarked) {
+              cellMode = 'marked';
+            } else if (isGameActive) {
+              if (
+                isPendingResponder &&
+                turnState === 'WAITING_FOR_RESPONSE' &&
+                pendingNumber &&
+                pendingNumber.number === val
+              ) {
+                cellMode = 'stamp';
+              } else if (
+                isMyTurn &&
+                turnState === 'SELECTING' &&
+                val !== 0 &&
+                !allSelectedNumbers.includes(val)
+              ) {
+                cellMode = 'select';
+              }
+            }
 
             return (
               <BingoCell
@@ -62,9 +98,9 @@ export const BingoBoard: React.FC<BingoBoardProps> = ({
                 col={cIdx}
                 value={val}
                 isMarked={isMarked}
-                isCalled={isCalled}
                 isWinningCell={isWinning}
                 isGameActive={isGameActive}
+                cellMode={cellMode}
                 onCellClick={onCellClick}
               />
             );
@@ -72,12 +108,29 @@ export const BingoBoard: React.FC<BingoBoardProps> = ({
         )}
       </div>
 
-      {/* Bottom Tip */}
+      {/* Dynamic Status / Tips Footer */}
       {isGameActive && (
         <div className="mt-3.5 text-center">
-          <p className="text-xs text-[#A8A296] font-medium">
-            💡 Tap <span className="text-[#F59E0B] font-bold">amber highlighted cells</span> when your number is drawn!
-          </p>
+          {isMyTurn && turnState === 'SELECTING' && (
+            <p className="text-xs text-[#F59E0B] font-bold animate-pulse">
+              🎯 Your turn! Tap any unmarked number on your board to choose it.
+            </p>
+          )}
+          {isPendingResponder && turnState === 'WAITING_FOR_RESPONSE' && (
+            <p className="text-xs text-[#F59E0B] font-bold animate-pulse">
+              ⚡ Opponent chose {pendingNumber?.number}! Tap the glowing cell to STAMP it.
+            </p>
+          )}
+          {isMyTurn && turnState === 'WAITING_FOR_RESPONSE' && (
+            <p className="text-xs text-[#A8A296] font-medium">
+              ⏳ Waiting for opponent to check their board for <span className="text-[#F59E0B] font-bold font-mono">{pendingNumber?.number}</span>...
+            </p>
+          )}
+          {!isMyTurn && turnState === 'SELECTING' && (
+            <p className="text-xs text-[#A8A296] font-medium">
+              ⏳ Opponent is choosing a number from their board...
+            </p>
+          )}
         </div>
       )}
     </div>

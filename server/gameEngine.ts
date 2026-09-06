@@ -221,3 +221,18 @@ export function checkBingo(marked: MarkedGrid): WinningPattern | null {
 export function getWinningNumbers(board: BingoBoard, pattern: WinningPattern): number[] {
   return pattern.coordinates.map(([r, c]) => board[r][c]);
 }
+
+/**
+ * Searches for a number on a 5x5 Bingo board and returns its (row, col) coordinates or null if not present.
+ */
+export function findNumberOnBoard(board: BingoBoard, targetNum: number): { row: number; col: number } | null {
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      if (board[r][c] === targetNum) {
+        return { row: r, col: c };
+      }
+    }
+  }
+  return null;
+}
+

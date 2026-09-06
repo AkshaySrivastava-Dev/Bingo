@@ -5,6 +5,8 @@ export type GamePhase =
   | 'PLAYING'
   | 'GAME_OVER';
 
+export type TurnState = 'SELECTING' | 'WAITING_FOR_RESPONSE';
+
 export interface BingoCellData {
   row: number;
   col: number;
@@ -27,6 +29,24 @@ export interface WinnerInfo {
   playerName: string;
   winningPattern: WinningPattern;
   winningNumbers: number[];
+}
+
+export interface MoveRecord {
+  number: number;
+  letter: string;
+  selectedBy: string;
+  selectedByName: string;
+  hasMatch: boolean;
+  markedByOpponent: boolean;
+  timestamp: number;
+}
+
+export interface PendingNumber {
+  number: number;
+  letter: string;
+  selectedBy: string;
+  selectedByName: string;
+  responderId: string;
 }
 
 export interface PlayerState {
@@ -65,9 +85,12 @@ export interface RoomState {
   code: string;
   phase: GamePhase;
   players: PlayerState[];
-  calledNumbers: number[];
-  currentNumber: number | null;
-  numberPool: number[];
+  activePlayerId: string | null;
+  turnState: TurnState;
+  pendingNumber: PendingNumber | null;
+  lastSelectedNumber: { number: number; letter: string; selectedBy: string; selectedByName: string } | null;
+  playHistory: MoveRecord[];
+  allSelectedNumbers: number[];
   countdown: number; // in seconds
   winner: WinnerInfo | null;
   round: number;
@@ -83,9 +106,14 @@ export interface ClientGameState {
     phase: GamePhase;
     round: number;
     countdown: number;
-    calledNumbers: number[];
-    currentNumber: number | null;
-    totalCalled: number;
+    activePlayerId: string | null;
+    turnState: TurnState;
+    pendingNumber: PendingNumber | null;
+    lastSelectedNumber: { number: number; letter: string; selectedBy: string; selectedByName: string } | null;
+    playHistory: MoveRecord[];
+    allSelectedNumbers: number[];
+    isMyTurn: boolean;
+    isPendingResponder: boolean;
     winner: WinnerInfo | null;
   };
   me: {
@@ -113,7 +141,10 @@ export type ErrorCode =
   | 'GAME_ALREADY_STARTED'
   | 'NOT_AUTHORIZED'
   | 'INVALID_MOVE'
-  | 'NUMBER_NOT_CALLED'
+  | 'NOT_YOUR_TURN'
+  | 'NUMBER_ALREADY_SELECTED'
+  | 'INVALID_SELECTION'
+  | 'NOT_PENDING_RESPONDER'
   | 'CELL_ALREADY_MARKED'
   | 'GAME_OVER'
   | 'INVALID_SESSION'
@@ -123,3 +154,4 @@ export interface ServerErrorResponse {
   code: ErrorCode;
   message: string;
 }
+

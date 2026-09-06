@@ -172,16 +172,51 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  // 6. Mark Cell
+  // 6. Select Number (Player picking a number on their turn)
   socket.on(
-    'mark_cell',
+    'select_number',
     (
       data: { roomId: string; sessionToken: string; row: number; col: number; value: number },
       callback
     ) => {
       try {
         const { roomId, sessionToken, row, col, value } = data || {};
-        const result = roomManager.markCell(roomId, sessionToken, row, col, value);
+        const result = roomManager.selectNumber(roomId, sessionToken, row, col, value);
+
+        if (!result.success) {
+          if (typeof callback === 'function') {
+            callback({ success: false, code: result.errorCode, message: result.errorMessage });
+          }
+          return;
+        }
+
+        if (typeof callback === 'function') {
+          callback({
+            success: true,
+            hasMatch: result.hasMatch,
+            pendingNumber: result.pendingNumber,
+            nextPlayerId: result.nextPlayerId,
+          });
+        }
+      } catch (err: any) {
+        console.error('Error selecting number:', err);
+        if (typeof callback === 'function') {
+          callback({ success: false, code: 'INTERNAL_ERROR', message: 'Failed to select number.' });
+        }
+      }
+    }
+  );
+
+  // 7. Mark Selected Number (Opponent responding and marking matching number)
+  socket.on(
+    'mark_selected_number',
+    (
+      data: { roomId: string; sessionToken: string; row: number; col: number; value: number },
+      callback
+    ) => {
+      try {
+        const { roomId, sessionToken, row, col, value } = data || {};
+        const result = roomManager.markSelectedNumber(roomId, sessionToken, row, col, value);
 
         if (!result.success) {
           if (typeof callback === 'function') {
@@ -201,9 +236,9 @@ io.on('connection', (socket: Socket) => {
           });
         }
       } catch (err: any) {
-        console.error('Error marking cell:', err);
+        console.error('Error marking selected number:', err);
         if (typeof callback === 'function') {
-          callback({ success: false, code: 'INTERNAL_ERROR', message: 'Failed to mark cell.' });
+          callback({ success: false, code: 'INTERNAL_ERROR', message: 'Failed to mark selected number.' });
         }
       }
     }

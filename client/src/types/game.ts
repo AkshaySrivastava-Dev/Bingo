@@ -5,6 +5,8 @@ export type GamePhase =
   | 'PLAYING'
   | 'GAME_OVER';
 
+export type TurnState = 'SELECTING' | 'WAITING_FOR_RESPONSE';
+
 export type BingoBoard = number[][]; // 5x5 matrix
 export type MarkedGrid = boolean[][]; // 5x5 boolean matrix
 
@@ -20,6 +22,24 @@ export interface WinnerInfo {
   playerName: string;
   winningPattern: WinningPattern;
   winningNumbers: number[];
+}
+
+export interface MoveRecord {
+  number: number;
+  letter: string;
+  selectedBy: string;
+  selectedByName: string;
+  hasMatch: boolean;
+  markedByOpponent: boolean;
+  timestamp: number;
+}
+
+export interface PendingNumber {
+  number: number;
+  letter: string;
+  selectedBy: string;
+  selectedByName: string;
+  responderId: string;
 }
 
 export interface PublicPlayerInfo {
@@ -42,9 +62,14 @@ export interface ClientGameState {
     phase: GamePhase;
     round: number;
     countdown: number;
-    calledNumbers: number[];
-    currentNumber: number | null;
-    totalCalled: number;
+    activePlayerId: string | null;
+    turnState: TurnState;
+    pendingNumber: PendingNumber | null;
+    lastSelectedNumber: { number: number; letter: string; selectedBy: string; selectedByName: string } | null;
+    playHistory: MoveRecord[];
+    allSelectedNumbers: number[];
+    isMyTurn: boolean;
+    isPendingResponder: boolean;
     winner: WinnerInfo | null;
   };
   me: {
@@ -72,3 +97,4 @@ export interface ToastMessage {
   type: 'info' | 'success' | 'warning' | 'error';
   message: string;
 }
+

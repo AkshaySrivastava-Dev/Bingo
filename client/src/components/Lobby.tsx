@@ -247,10 +247,11 @@ export const Lobby: React.FC<LobbyProps> = ({
           <div className="bg-[#1A1D24]/70 border border-[#2B303C] rounded-2xl p-4 text-xs text-[#A8A296] space-y-1">
             <div className="flex items-center gap-1.5 font-bold text-[#F4EFE6]">
               <ShieldCheck className="w-4 h-4 text-[#F59E0B]" />
-              <span>Official 5x5 Bingo Rules</span>
+              <span>Turn-Based 1v1 Bingo Rules</span>
             </div>
-            <p>&bull; Numbers 1–75 are called automatically every 4 seconds.</p>
-            <p>&bull; The first player to complete any 5-in-a-row (Row, Column, or Diagonal) wins BINGO!</p>
+            <p>&bull; Players take turns selecting a number from their own board.</p>
+            <p>&bull; If opponent has the number, they must stamp it.</p>
+            <p>&bull; First player to complete 1 line (Row, Column, or Diagonal) wins BINGO!</p>
           </div>
         </div>
 
@@ -267,9 +268,13 @@ export const Lobby: React.FC<LobbyProps> = ({
           <BingoBoard
             board={me.board}
             markedCells={me.markedCells}
-            calledNumbers={[]}
             winningPattern={null}
             isGameActive={false}
+            isMyTurn={false}
+            turnState="SELECTING"
+            isPendingResponder={false}
+            pendingNumber={null}
+            allSelectedNumbers={[]}
             onCellClick={() => {}}
           />
         </div>
