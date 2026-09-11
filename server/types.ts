@@ -1,3 +1,5 @@
+export type GameMode = 'NUMBERS_ONLY' | 'NUMBERS_AND_WORDS' | 'WORDS_ONLY';
+
 export type GamePhase =
   | 'WAITING_FOR_PLAYER'
   | 'LOBBY'
@@ -5,22 +7,19 @@ export type GamePhase =
   | 'PLAYING'
   | 'GAME_OVER';
 
-export type TurnState = 'SELECTING' | 'WAITING_FOR_RESPONSE';
-
-export interface BingoCellData {
-  row: number;
-  col: number;
-  value: number; // 0 for FREE space
-  isFree: boolean;
+export interface BingoItem {
+  id: string; // e.g. "num_7", "word_APPLE", "pair_7_APPLE"
+  number?: number; // 1-25
+  word?: string; // e.g. "APPLE"
 }
 
-export type BingoBoard = number[][]; // 5x5 matrix
+export type BingoBoard = BingoItem[][]; // 5x5 matrix
 export type MarkedGrid = boolean[][]; // 5x5 boolean matrix
 
 export interface WinningPattern {
   type: 'row' | 'col' | 'diagonal';
   index?: number; // row index (0-4) or col index (0-4)
-  name: string; // e.g. "Row 3", "Column B", "Main Diagonal"
+  name: string; // e.g. "Row 1", "Column B", "Main Diagonal"
   coordinates: [number, number][]; // list of 5 coordinates [row, col]
 }
 
@@ -28,25 +27,16 @@ export interface WinnerInfo {
   playerId: string;
   playerName: string;
   winningPattern: WinningPattern;
-  winningNumbers: number[];
+  winningItems: BingoItem[];
 }
 
 export interface MoveRecord {
-  number: number;
-  letter: string;
+  item: BingoItem;
   selectedBy: string;
   selectedByName: string;
-  hasMatch: boolean;
-  markedByOpponent: boolean;
+  hasMatch: boolean; // whether opponent had the item on their board
+  markedOnOpponent: boolean; // whether opponent's cell was automatically marked
   timestamp: number;
-}
-
-export interface PendingNumber {
-  number: number;
-  letter: string;
-  selectedBy: string;
-  selectedByName: string;
-  responderId: string;
 }
 
 export interface PlayerState {
@@ -83,14 +73,13 @@ export interface PublicPlayerInfo {
 export interface RoomState {
   id: string;
   code: string;
+  mode: GameMode;
   phase: GamePhase;
   players: PlayerState[];
   activePlayerId: string | null;
-  turnState: TurnState;
-  pendingNumber: PendingNumber | null;
-  lastSelectedNumber: { number: number; letter: string; selectedBy: string; selectedByName: string } | null;
+  lastMove: MoveRecord | null;
   playHistory: MoveRecord[];
-  allSelectedNumbers: number[];
+  allSelectedItems: BingoItem[];
   countdown: number; // in seconds
   winner: WinnerInfo | null;
   round: number;
@@ -103,17 +92,15 @@ export interface ClientGameState {
   room: {
     id: string;
     code: string;
+    mode: GameMode;
     phase: GamePhase;
     round: number;
     countdown: number;
     activePlayerId: string | null;
-    turnState: TurnState;
-    pendingNumber: PendingNumber | null;
-    lastSelectedNumber: { number: number; letter: string; selectedBy: string; selectedByName: string } | null;
+    lastMove: MoveRecord | null;
     playHistory: MoveRecord[];
-    allSelectedNumbers: number[];
+    allSelectedItems: BingoItem[];
     isMyTurn: boolean;
-    isPendingResponder: boolean;
     winner: WinnerInfo | null;
   };
   me: {
@@ -142,13 +129,13 @@ export type ErrorCode =
   | 'NOT_AUTHORIZED'
   | 'INVALID_MOVE'
   | 'NOT_YOUR_TURN'
-  | 'NUMBER_ALREADY_SELECTED'
+  | 'ITEM_ALREADY_SELECTED'
   | 'INVALID_SELECTION'
-  | 'NOT_PENDING_RESPONDER'
   | 'CELL_ALREADY_MARKED'
   | 'GAME_OVER'
   | 'INVALID_SESSION'
-  | 'INVALID_NAME';
+  | 'INVALID_NAME'
+  | 'INVALID_MODE';
 
 export interface ServerErrorResponse {
   code: ErrorCode;

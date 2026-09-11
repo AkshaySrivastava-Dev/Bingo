@@ -1,19 +1,20 @@
 import React from 'react';
-import type { ClientGameState } from '../types/game';
+import type { ClientGameState, BingoItem } from '../types/game';
 import { BingoBoard } from './BingoBoard';
 import { CurrentNumber } from './CurrentNumber';
 import { CalledNumbers } from './CalledNumbers';
 import { PlayerCard } from './PlayerCard';
-import { Users, Sparkles, Clock, AlertCircle } from 'lucide-react';
+import { Users, Sparkles, Clock } from 'lucide-react';
 
 interface GameRoomProps {
   gameState: ClientGameState;
-  onCellClick: (row: number, col: number, value: number) => void;
+  onCellClick: (row: number, col: number, item: BingoItem) => void;
 }
 
 export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) => {
   const { room, me, opponent } = gameState;
   const isGameActive = room.phase === 'PLAYING';
+  const gameMode = room.mode || 'NUMBERS_ONLY';
 
   // Active player name helper
   const activePlayerName =
@@ -23,59 +24,32 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
       ? opponent.name
       : 'Player';
 
-  const lastMove = room.playHistory && room.playHistory.length > 0
-    ? room.playHistory[room.playHistory.length - 1]
-    : null;
+  const lastMove =
+    room.playHistory && room.playHistory.length > 0
+      ? room.playHistory[room.playHistory.length - 1]
+      : null;
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6 space-y-5">
-      {/* Prominent Turn Banner */}
+      {/* Prominent Fast Turn Banner */}
       {isGameActive && (
         <div
-          className={`w-full py-3 px-4 sm:px-6 rounded-2xl border flex items-center justify-between gap-3 shadow-lg transition-all ${
-            room.isMyTurn && room.turnState === 'SELECTING'
+          className={`w-full py-3.5 px-4 sm:px-6 rounded-2xl border flex items-center justify-between gap-3 shadow-lg transition-all ${
+            room.isMyTurn
               ? 'bg-gradient-to-r from-[#D97706]/20 via-[#B45309]/15 to-[#D97706]/20 border-[#F59E0B] text-[#F59E0B]'
-              : room.isPendingResponder && room.turnState === 'WAITING_FOR_RESPONSE'
-              ? 'bg-gradient-to-r from-[#E11D48]/20 via-[#9F1239]/15 to-[#E11D48]/20 border-[#F43F5E] text-[#FB7185] animate-pulse'
-              : room.isMyTurn && room.turnState === 'WAITING_FOR_RESPONSE'
-              ? 'bg-[#1A1D24] border-[#313644] text-[#A8A296]'
               : 'bg-[#1A1D24] border-[#313644] text-[#A8A296]'
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            {room.isMyTurn && room.turnState === 'SELECTING' ? (
+            {room.isMyTurn ? (
               <>
-                <Sparkles className="w-5 h-5 shrink-0 text-[#F59E0B]" />
+                <Sparkles className="w-5 h-5 shrink-0 text-[#F59E0B] animate-spin-slow" />
                 <div className="min-w-0">
                   <h2 className="text-sm sm:text-base font-black tracking-tight text-[#F4EFE6]">
-                    YOUR TURN TO CHOOSE
+                    YOUR TURN TO PICK
                   </h2>
                   <p className="text-xs font-semibold text-[#F59E0B] truncate">
-                    Tap any unmarked number from your board to call it!
-                  </p>
-                </div>
-              </>
-            ) : room.isPendingResponder && room.turnState === 'WAITING_FOR_RESPONSE' ? (
-              <>
-                <AlertCircle className="w-5 h-5 shrink-0 text-[#FB7185]" />
-                <div className="min-w-0">
-                  <h2 className="text-sm sm:text-base font-black tracking-tight text-[#F4EFE6]">
-                    OPPONENT CALLED {room.pendingNumber?.number}!
-                  </h2>
-                  <p className="text-xs font-semibold text-[#FB7185] truncate">
-                    It matches your board! Tap the highlighted cell to STAMP it.
-                  </p>
-                </div>
-              </>
-            ) : room.isMyTurn && room.turnState === 'WAITING_FOR_RESPONSE' ? (
-              <>
-                <Clock className="w-5 h-5 shrink-0 text-[#F59E0B]" />
-                <div className="min-w-0">
-                  <h2 className="text-sm sm:text-base font-black tracking-tight text-[#F4EFE6]">
-                    YOU CALLED {room.pendingNumber?.number}
-                  </h2>
-                  <p className="text-xs font-semibold text-[#A8A296] truncate">
-                    Waiting for {opponent?.name || 'opponent'} to check their board...
+                    Tap any unmarked tile on your board to choose it!
                   </p>
                 </div>
               </>
@@ -87,7 +61,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
                     {opponent?.name || 'OPPONENT'}&apos;S TURN
                   </h2>
                   <p className="text-xs font-semibold text-[#A8A296] truncate">
-                    Opponent is picking a number from their board...
+                    Opponent is picking a tile from their board...
                   </p>
                 </div>
               </>
@@ -103,17 +77,15 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
       {/* Top Banner on Mobile */}
       <div className="lg:hidden space-y-4">
         <CurrentNumber
-          pendingNumber={room.pendingNumber}
           lastMove={lastMove}
-          turnState={room.turnState}
+          mode={gameMode}
           activePlayerName={activePlayerName}
           isMyTurn={room.isMyTurn}
-          isPendingResponder={room.isPendingResponder}
-          totalCalls={room.allSelectedNumbers?.length ?? 0}
+          totalCalls={room.playHistory?.length ?? 0}
         />
         <CalledNumbers
           playHistory={room.playHistory || []}
-          allSelectedNumbers={room.allSelectedNumbers || []}
+          mode={gameMode}
         />
       </div>
 
@@ -123,14 +95,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
         <div className="lg:col-span-7 flex flex-col items-center">
           <BingoBoard
             board={me.board}
+            mode={gameMode}
             markedCells={me.markedCells}
             winningPattern={room.winner?.winningPattern}
             isGameActive={isGameActive}
             isMyTurn={room.isMyTurn}
-            turnState={room.turnState}
-            isPendingResponder={room.isPendingResponder}
-            pendingNumber={room.pendingNumber}
-            allSelectedNumbers={room.allSelectedNumbers || []}
             onCellClick={onCellClick}
           />
         </div>
@@ -140,13 +109,11 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
           {/* Current Move display (desktop view) */}
           <div className="hidden lg:block">
             <CurrentNumber
-              pendingNumber={room.pendingNumber}
               lastMove={lastMove}
-              turnState={room.turnState}
+              mode={gameMode}
               activePlayerName={activePlayerName}
               isMyTurn={room.isMyTurn}
-              isPendingResponder={room.isPendingResponder}
-              totalCalls={room.allSelectedNumbers?.length ?? 0}
+              totalCalls={room.playHistory?.length ?? 0}
             />
           </div>
 
@@ -154,7 +121,7 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
           <div className="hidden lg:block">
             <CalledNumbers
               playHistory={room.playHistory || []}
-              allSelectedNumbers={room.allSelectedNumbers || []}
+              mode={gameMode}
             />
           </div>
 
@@ -182,8 +149,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
                 isMe={true}
                 phase={room.phase}
                 isPlayerTurn={room.isMyTurn}
-                turnState={room.turnState}
-                isPendingResponder={room.isPendingResponder}
               />
 
               {/* Opponent */}
@@ -198,8 +163,6 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
                   isMe={false}
                   phase={room.phase}
                   isPlayerTurn={!room.isMyTurn}
-                  turnState={room.turnState}
-                  isPendingResponder={!room.isPendingResponder}
                 />
               ) : (
                 <div className="p-3 rounded-xl bg-[#12141A] border border-[#313644] text-xs text-[#A8A296] text-center">
@@ -213,4 +176,5 @@ export const GameRoom: React.FC<GameRoomProps> = ({ gameState, onCellClick }) =>
     </div>
   );
 };
+
 

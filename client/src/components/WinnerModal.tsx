@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import type { WinnerInfo, PublicPlayerInfo } from '../types/game';
+import type { WinnerInfo, PublicPlayerInfo, GameMode, BingoItem } from '../types/game';
 import { Trophy, RotateCcw, LogOut, CheckCircle2, Award, Sparkles } from 'lucide-react';
 
 interface WinnerModalProps {
   winner: WinnerInfo | null;
+  mode?: GameMode;
   me: {
     id: string;
     name: string;
@@ -17,6 +18,7 @@ interface WinnerModalProps {
 
 export const WinnerModal: React.FC<WinnerModalProps> = ({
   winner,
+  mode = 'NUMBERS_ONLY',
   me,
   opponent,
   onRequestRematch,
@@ -68,6 +70,14 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
   const opponentRematch = opponent?.rematchRequested ?? false;
   const rematchCount = (myRematch ? 1 : 0) + (opponentRematch ? 1 : 0);
 
+  const formatWinningItem = (item: BingoItem) => {
+    if (mode === 'NUMBERS_ONLY') return `${item.number}`;
+    if (mode === 'WORDS_ONLY') return `${item.word}`;
+    return `${item.number} ${item.word}`;
+  };
+
+  const winningItems = winner.winningItems ?? [];
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
       <div className="bg-[#1A1D24] border-2 border-[#D97706]/50 rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl relative overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -92,19 +102,19 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
           </p>
         </div>
 
-        {/* Winning Numbers Pill */}
-        {winner.winningNumbers && winner.winningNumbers.length > 0 && (
+        {/* Winning Line Items */}
+        {winningItems.length > 0 && (
           <div className="bg-[#12141A] border border-[#313644] rounded-2xl p-3.5 mb-5">
-            <span className="text-[10px] font-black text-[#A8A296] block mb-1.5 uppercase tracking-widest">
-              Winning Line Numbers
+            <span className="text-[10px] font-black text-[#A8A296] block mb-2 uppercase tracking-widest">
+              Winning 5-Tile Line
             </span>
             <div className="flex items-center justify-center gap-1.5 flex-wrap">
-              {winner.winningNumbers.map((num, i) => (
+              {winningItems.map((item, i) => (
                 <span
-                  key={i}
-                  className="w-9 h-9 rounded-xl bg-[#D97706]/20 border border-[#D97706]/40 text-[#F59E0B] font-black text-xs font-mono flex items-center justify-center shadow-sm"
+                  key={item.id ?? i}
+                  className="px-2.5 py-1.5 rounded-xl bg-[#D97706]/20 border border-[#D97706]/40 text-[#F59E0B] font-black text-xs font-mono flex items-center justify-center shadow-sm"
                 >
-                  {num === 0 ? 'FREE' : num}
+                  {formatWinningItem(item)}
                 </span>
               ))}
             </div>
@@ -155,4 +165,5 @@ export const WinnerModal: React.FC<WinnerModalProps> = ({
     </div>
   );
 };
+
 

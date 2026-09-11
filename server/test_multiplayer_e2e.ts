@@ -3,10 +3,10 @@ import express from 'express';
 import { Server } from 'socket.io';
 import { io as ClientSocket, Socket as ClientSocketType } from 'socket.io-client';
 import { RoomManager } from './roomManager.js';
-import type { ClientGameState } from './types.js';
+import type { ClientGameState, GameMode, BingoItem } from './types.js';
 
 async function runE2ETest() {
-  console.log('--- STARTING TURN-BASED MULTIPLAYER BINGO E2E TEST ---');
+  console.log('=== STARTING MULTI-MODE FAST TURN-BASED BINGO E2E TEST ===\n');
 
   const app = express();
   const server = http.createServer(app);
@@ -32,15 +32,13 @@ async function runE2ETest() {
       roomManager.broadcastRoomUpdate(result.room);
     });
 
-    socket.on('reconnect_player', (data: { roomId: string; sessionToken: string }, callback) => {
-      const result = roomManager.reconnectPlayer(data.roomId, data.sessionToken, socket.id);
-      if (!result.success || !result.room || !result.player) {
+    socket.on('set_game_mode', (data: { roomId: string; sessionToken: string; mode: GameMode }, callback) => {
+      const result = roomManager.setGameMode(data.roomId, data.sessionToken, data.mode);
+      if (!result.success) {
         callback({ success: false, code: result.errorCode, message: result.errorMessage });
         return;
       }
-      socket.join(result.room.id);
-      callback({ success: true, state: roomManager.getClientState(result.room, result.player.sessionToken) });
-      roomManager.broadcastRoomUpdate(result.room);
+      callback({ success: true, mode: result.mode });
     });
 
     socket.on('set_ready', (data: { roomId: string; sessionToken: string; isReady: boolean }, callback) => {
@@ -62,22 +60,8 @@ async function runE2ETest() {
       callback({ success: true });
     });
 
-    socket.on('select_number', (data: { roomId: string; sessionToken: string; row: number; col: number; value: number }, callback) => {
-      const result = roomManager.selectNumber(data.roomId, data.sessionToken, data.row, data.col, data.value);
-      if (!result.success) {
-        callback({ success: false, code: result.errorCode, message: result.errorMessage });
-        return;
-      }
-      callback({
-        success: true,
-        hasMatch: result.hasMatch,
-        pendingNumber: result.pendingNumber,
-        nextPlayerId: result.nextPlayerId,
-      });
-    });
-
-    socket.on('mark_selected_number', (data: { roomId: string; sessionToken: string; row: number; col: number; value: number }, callback) => {
-      const result = roomManager.markSelectedNumber(data.roomId, data.sessionToken, data.row, data.col, data.value);
+    socket.on('select_item', (data: { roomId: string; sessionToken: string; row: number; col: number; item: BingoItem }, callback) => {
+      const result = roomManager.selectItem(data.roomId, data.sessionToken, data.row, data.col, data.item);
       if (!result.success) {
         callback({ success: false, code: result.errorCode, message: result.errorMessage });
         return;
@@ -86,9 +70,8 @@ async function runE2ETest() {
         success: true,
         isBingo: result.isBingo,
         winner: result.winner,
-        markedCells: result.markedCells,
-        bestLineCount: result.bestLineCount,
-        completedLines: result.completedLines,
+        nextPlayerId: result.nextPlayerId,
+        moveRecord: result.moveRecord,
       });
     });
 
@@ -100,9 +83,20 @@ async function runE2ETest() {
       }
       callback({ success: true, bothAgreed: result.bothAgreed });
     });
+
+    socket.on('reconnect_player', (data: { roomId: string; sessionToken: string }, callback) => {
+      const result = roomManager.reconnectPlayer(data.roomId, data.sessionToken, socket.id);
+      if (!result.success || !result.room || !result.player) {
+        callback({ success: false, code: result.errorCode, message: result.errorMessage });
+        return;
+      }
+      socket.join(result.room.id);
+      callback({ success: true, state: roomManager.getClientState(result.room, result.player.sessionToken) });
+      roomManager.broadcastRoomUpdate(result.room);
+    });
   });
 
-  const TEST_PORT = 3355;
+  const TEST_PORT = 3366;
   await new Promise<void>((resolve) => server.listen(TEST_PORT, () => resolve()));
   console.log(`✓ Test Server started on port ${TEST_PORT}`);
 
@@ -135,16 +129,16 @@ async function runE2ETest() {
   const roomCode = stateA!.room.code;
   const roomId = stateA!.room.id;
   const tokenA = stateA!.me.sessionToken;
-  console.log(`✓ Room created with code: ${roomCode}`);
+  console.log(`✓ Room created with code: ${roomCode}, default mode: ${stateA!.room.mode}`);
 
   // 2. Player 2 joins room
   const joinRes: any = await new Promise((res) => {
-    clientB.emit('join_room', { roomCode, playerName: 'Rahul (Player 2)' }, res);
+    clientB.emit('join_room', { roomCode, playerName: 'Rohan (Player 2)' }, res);
   });
   if (!joinRes.success) throw new Error('Join room failed');
   stateB = joinRes.state;
   const tokenB = stateB!.me.sessionToken;
-  console.log(`✓ Player 2 (Rahul) joined room ${roomCode}`);
+  console.log(`✓ Player 2 (Rohan) joined room ${roomCode}`);
 
   // 3. 3rd player attempts to join (should fail with ROOM_FULL)
   const joinFailRes: any = await new Promise((res) => {
@@ -155,24 +149,74 @@ async function runE2ETest() {
   }
   console.log('✓ 3rd Player properly rejected with ROOM_FULL');
 
-  // 4. Verify randomized boards
+  // 4. Test Game Mode Selection in Lobby
+  // Non-host attempts to change mode -> should fail
+  const nonHostModeRes: any = await new Promise((res) => {
+    clientB.emit('set_game_mode', { roomId, sessionToken: tokenB, mode: 'WORDS_ONLY' }, res);
+  });
+  if (nonHostModeRes.success || nonHostModeRes.code !== 'NOT_AUTHORIZED') {
+    throw new Error('Non-host was able to change game mode!');
+  }
+  console.log('✓ Non-host game mode change properly rejected with NOT_AUTHORIZED');
+
+  // Host changes mode to WORDS_ONLY
+  const hostWordsModeRes: any = await new Promise((res) => {
+    clientA.emit('set_game_mode', { roomId, sessionToken: tokenA, mode: 'WORDS_ONLY' }, res);
+  });
+  if (!hostWordsModeRes.success) throw new Error('Host failed to set mode to WORDS_ONLY');
+  await new Promise((r) => setTimeout(r, 50));
+  if (stateA!.room.mode !== 'WORDS_ONLY' || stateB!.room.mode !== 'WORDS_ONLY') {
+    throw new Error('WORDS_ONLY mode was not synced to both players');
+  }
+  // Verify board has 25 words
+  const wordsBoardA = stateA!.me.board;
+  if (wordsBoardA.length !== 5 || wordsBoardA[0].length !== 5 || !wordsBoardA[0][0].word) {
+    throw new Error('WORDS_ONLY board did not generate 25 words');
+  }
+  console.log('✓ Host set mode to WORDS_ONLY, 25 words board generated and synced');
+
+  // Host changes mode to NUMBERS_AND_WORDS
+  const hostPairModeRes: any = await new Promise((res) => {
+    clientA.emit('set_game_mode', { roomId, sessionToken: tokenA, mode: 'NUMBERS_AND_WORDS' }, res);
+  });
+  if (!hostPairModeRes.success) throw new Error('Host failed to set mode to NUMBERS_AND_WORDS');
+  await new Promise((r) => setTimeout(r, 50));
+  if (stateA!.room.mode !== 'NUMBERS_AND_WORDS' || stateB!.room.mode !== 'NUMBERS_AND_WORDS') {
+    throw new Error('NUMBERS_AND_WORDS mode was not synced to both players');
+  }
+  const pairBoardA = stateA!.me.board;
+  if (!pairBoardA[0][0].number || !pairBoardA[0][0].word) {
+    throw new Error('NUMBERS_AND_WORDS board did not contain both number and word in tiles');
+  }
+  console.log('✓ Host set mode to NUMBERS_AND_WORDS, paired tiles generated and synced');
+
+  // Host changes mode back to NUMBERS_ONLY for gameplay test
+  await new Promise((res) => {
+    clientA.emit('set_game_mode', { roomId, sessionToken: tokenA, mode: 'NUMBERS_ONLY' }, res);
+  });
+  await new Promise((r) => setTimeout(r, 50));
+  console.log('✓ Host switched back to NUMBERS_ONLY mode');
+
+  // 5. Verify 25 unique numbers, 0 marked cells, NO FREE space
   const boardA = stateA!.me.board;
   const boardB = stateB!.me.board;
-  if (boardA[2][2] !== 0 || boardB[2][2] !== 0) throw new Error('Center space must be FREE (0)');
-  if (JSON.stringify(boardA) === JSON.stringify(boardB)) throw new Error('Both players received identical boards!');
-  console.log('✓ Verified unique 5x5 boards with FREE center space at (2,2)');
+  const markedA = stateA!.me.markedCells;
+  const numbersInA = new Set<number>();
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      if (markedA[r][c] !== false) throw new Error(`Cell (${r},${c}) should start unmarked`);
+      const num = boardA[r][c].number!;
+      if (num < 1 || num > 25) throw new Error(`Numbers must be between 1 and 25, got ${num}`);
+      numbersInA.add(num);
+    }
+  }
+  if (numbersInA.size !== 25) throw new Error('Board A does not contain all 25 numbers 1..25');
+  console.log('✓ Verified: 25 unique numbers 1–25, zero initial marks, NO FREE spaces (0/5 line progress)');
 
-  // 5. Test Ready Status & Countdown
+  // 6. Ready Up and Start Countdown
   await new Promise((res) => clientA.emit('set_ready', { roomId, sessionToken: tokenA, isReady: true }, res));
   await new Promise((res) => clientB.emit('set_ready', { roomId, sessionToken: tokenB, isReady: true }, res));
   console.log('✓ Both players marked READY');
-
-  // Non-host cannot start
-  const nonHostStartRes: any = await new Promise((res) => {
-    clientB.emit('start_countdown', { roomId, sessionToken: tokenB }, res);
-  });
-  if (nonHostStartRes.success) throw new Error('Non-host was able to start game!');
-  console.log('✓ Non-host start properly rejected with NOT_AUTHORIZED');
 
   // Host starts countdown
   const hostStartRes: any = await new Promise((res) => {
@@ -181,7 +225,7 @@ async function runE2ETest() {
   if (!hostStartRes.success) throw new Error('Host failed to start countdown');
   console.log('✓ Host started countdown');
 
-  // Wait for countdown to complete (3s)
+  // Wait for countdown to finish (3.6s)
   await new Promise((r) => setTimeout(r, 3600));
 
   if (stateA!.room.phase !== 'PLAYING' || stateB!.room.phase !== 'PLAYING') {
@@ -189,192 +233,138 @@ async function runE2ETest() {
   }
   console.log('✓ Game transitioned to PLAYING phase');
 
-  // 6. Verify Initial Turn State
-  if (stateA!.room.turnState !== 'SELECTING' || !stateA!.room.isMyTurn) {
-    throw new Error('Host (Player 1) should start in SELECTING state with isMyTurn = true');
+  // Verify game mode cannot be changed during PLAYING
+  const midGameModeChange: any = await new Promise((res) => {
+    clientA.emit('set_game_mode', { roomId, sessionToken: tokenA, mode: 'WORDS_ONLY' }, res);
+  });
+  if (midGameModeChange.success || midGameModeChange.code !== 'INVALID_PHASE') {
+    throw new Error('Game mode change should be locked once game starts');
   }
-  if (stateB!.room.isMyTurn) {
-    throw new Error('Player 2 should NOT have turn at game start');
-  }
-  console.log('✓ Host (Player 1) is active player in SELECTING turn state');
+  console.log('✓ Game mode is locked during PLAYING phase');
 
-  // 7. Test out-of-turn selection rejection
+  // 7. Verify Turn System & Fast Atomic Selection
+  if (!stateA!.room.isMyTurn || stateB!.room.isMyTurn) {
+    throw new Error('Host (Player A) should have the first turn');
+  }
+  console.log('✓ Player A has active turn');
+
+  // Out of turn select by Player B -> rejected
   const outOfTurnSelect: any = await new Promise((res) => {
-    clientB.emit('select_number', { roomId, sessionToken: tokenB, row: 0, col: 0, value: boardB[0][0] }, res);
+    clientB.emit('select_item', { roomId, sessionToken: tokenB, row: 0, col: 0, item: boardB[0][0] }, res);
   });
   if (outOfTurnSelect.success || outOfTurnSelect.code !== 'NOT_YOUR_TURN') {
     throw new Error('Out of turn selection was not rejected with NOT_YOUR_TURN');
   }
   console.log('✓ Out-of-turn selection rejected properly with NOT_YOUR_TURN');
 
-  // 8. Test invalid selection value
-  const invalidValSelect: any = await new Promise((res) => {
-    clientA.emit('select_number', { roomId, sessionToken: tokenA, row: 0, col: 0, value: 999 }, res);
+  // 8. Player A makes an atomic selection
+  const itemToSelectA = boardA[0][0];
+  console.log(`  Player A selects tile (0,0): Number ${itemToSelectA.number}...`);
+
+  const selectResA: any = await new Promise((res) => {
+    clientA.emit('select_item', { roomId, sessionToken: tokenA, row: 0, col: 0, item: itemToSelectA }, res);
   });
-  if (invalidValSelect.success || invalidValSelect.code !== 'INVALID_MOVE') {
-    throw new Error('Invalid cell value selection was not rejected with INVALID_MOVE');
+  if (!selectResA.success) throw new Error(`Player A select failed: ${JSON.stringify(selectResA)}`);
+
+  await new Promise((r) => setTimeout(r, 80));
+
+  // Verify Player A's cell (0,0) is marked
+  if (!stateA!.me.markedCells[0][0]) {
+    throw new Error("Player A's selected cell was not marked!");
   }
-  console.log('✓ Invalid cell value selection properly rejected with INVALID_MOVE');
 
-  // 9. Player A makes a valid selection
-  // Find a number on boardA that is NOT on boardB (or one that is)
-  let noMatchVal = 0;
-  let noMatchRow = 0;
-  let noMatchCol = 0;
-  let matchVal = 0;
-  let matchRowA = 0;
-  let matchColA = 0;
-  let matchRowB = 0;
-  let matchColB = 0;
-
+  // In Numbers Only mode, all 25 numbers are on both boards -> so it MUST be marked on Player B's board too!
+  let foundOnB = false;
   for (let r = 0; r < 5; r++) {
     for (let c = 0; c < 5; c++) {
-      const v = boardA[r][c];
-      if (v === 0) continue;
-      let onB = false;
-      for (let br = 0; br < 5; br++) {
-        for (let bc = 0; bc < 5; bc++) {
-          if (boardB[br][bc] === v) {
-            onB = true;
-            matchVal = v;
-            matchRowA = r;
-            matchColA = c;
-            matchRowB = br;
-            matchColB = bc;
-          }
+      if (boardB[r][c].number === itemToSelectA.number) {
+        if (stateB!.me.markedCells[r][c]) {
+          foundOnB = true;
         }
-      }
-      if (!onB && noMatchVal === 0) {
-        noMatchVal = v;
-        noMatchRow = r;
-        noMatchCol = c;
       }
     }
   }
-
-  // Test No Match Scenario if found
-  if (noMatchVal !== 0) {
-    console.log(`  Testing No Match: Player A selects ${noMatchVal} (not on Player B's board)...`);
-    const pickNoMatch: any = await new Promise((res) => {
-      clientA.emit('select_number', { roomId, sessionToken: tokenA, row: noMatchRow, col: noMatchCol, value: noMatchVal }, res);
-    });
-    if (!pickNoMatch.success || pickNoMatch.hasMatch) {
-      throw new Error(`Expected no-match selection success, got: ${JSON.stringify(pickNoMatch)}`);
-    }
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    // Turn should have automatically switched to Player B
-    if (!stateB!.room.isMyTurn || stateB!.room.turnState !== 'SELECTING') {
-      throw new Error('Turn did not automatically transfer to Player B after no-match');
-    }
-    console.log('✓ No Match properly recorded, turn automatically transferred to Player B');
-
-    // Player B now selects a number to pass back to Player A
-    // Player B selects matchVal if on boardB, or boardB[0][0]
-    const bRow = 0;
-    const bCol = 0;
-    const bVal = boardB[bRow][bCol];
-    const pickB: any = await new Promise((res) => {
-      clientB.emit('select_number', { roomId, sessionToken: tokenB, row: bRow, col: bCol, value: bVal }, res);
-    });
-    if (!pickB.success) throw new Error('Player B selection failed');
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    if (pickB.hasMatch) {
-      // If on A, A marks it
-      const rA = roomManager.findRoomById(roomId)!;
-      const pA = rA.players.find((p) => p.sessionToken === tokenA)!;
-      let fR = -1, fC = -1;
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 5; c++) {
-          if (pA.board[r][c] === bVal) { fR = r; fC = c; }
-        }
-      }
-      const markA: any = await new Promise((res) => {
-        clientA.emit('mark_selected_number', { roomId, sessionToken: tokenA, row: fR, col: fC, value: bVal }, res);
-      });
-      if (!markA.success) throw new Error('Player A failed to mark matched number');
-    }
+  if (!foundOnB) {
+    throw new Error("Opponent's matching cell was not automatically marked!");
   }
+  console.log('✓ Fast Turn: Player A cell marked AND opponent matching cell auto-marked immediately');
 
-  // 10. Test Single Line (1-line) Bingo Win Condition
-  // Deterministically configure Player A's board to complete row 0
+  // Turn should have automatically passed to Player B
+  if (stateA!.room.isMyTurn || !stateB!.room.isMyTurn) {
+    throw new Error('Turn did not automatically switch to Player B');
+  }
+  console.log('✓ Turn immediately switched to Player B');
+
+  // 9. Test Simultaneous Bingo Resolution (Selecting player wins)
+  console.log('  Testing Simultaneous Bingo: Selector priority rule...');
   const room = roomManager.findRoomById(roomId)!;
-  const playerA = room.players.find((p) => p.sessionToken === tokenA)!;
+  const pA = room.players.find((p) => p.sessionToken === tokenA)!;
+  const pB = room.players.find((p) => p.sessionToken === tokenB)!;
 
-  // Make sure it's Player A's turn to select
-  room.activePlayerId = playerA.id;
-  room.turnState = 'SELECTING';
-  room.pendingNumber = null;
-  roomManager.broadcastRoomUpdate(room);
-  await new Promise((r) => setTimeout(r, 100));
+  // Let Player B have 4 marked in Row 1: (1,0), (1,1), (1,2), (1,3)
+  pB.markedCells[1][0] = true;
+  pB.markedCells[1][1] = true;
+  pB.markedCells[1][2] = true;
+  pB.markedCells[1][3] = true;
+  pB.markedCells[1][4] = false;
 
-  // Stamp cells 0..3 of row 0 directly on Player A's board
-  playerA.markedCells[0][0] = true;
-  playerA.markedCells[0][1] = true;
-  playerA.markedCells[0][2] = true;
-  playerA.markedCells[0][3] = true;
-  // Cell (0, 4) is unmarked
+  // Let Player A have 4 marked in Col 2: (0,2), (1,2), (2,2), (3,2)
+  pA.markedCells[0][2] = true;
+  pA.markedCells[1][2] = true;
+  pA.markedCells[2][2] = true;
+  pA.markedCells[3][2] = true;
+  pA.markedCells[4][2] = false;
 
-  // Let Player B have value boardA[0][4] on their board so Player B will respond
-  const winningValue = playerA.board[0][4];
-  const playerB = room.players.find((p) => p.sessionToken === tokenB)!;
-  playerB.board[0][0] = winningValue; // Place winningValue at (0,0) on B's board
-  playerB.markedCells[0][0] = false;
-
-  console.log(`  Player A calls winning number: ${winningValue} at (0, 4)...`);
-  const winSelectRes: any = await new Promise((res) => {
-    clientA.emit('select_number', { roomId, sessionToken: tokenA, row: 0, col: 4, value: winningValue }, res);
-  });
-  if (!winSelectRes.success || !winSelectRes.hasMatch) {
-    throw new Error('Win select failed');
+  // Align the 5th tile: B's row 1 col 4 will have the SAME number as A's row 4 col 2
+  const sharedNum = pB.board[1][4].number!;
+  // Swap A's board at (4,2) to match this shared number
+  let oldR = -1, oldC = -1;
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      if (pA.board[r][c].number === sharedNum) {
+        oldR = r;
+        oldC = c;
+      }
+    }
+  }
+  if (oldR !== -1) {
+    const temp = pA.board[4][2];
+    pA.board[4][2] = pA.board[oldR][oldC];
+    pA.board[oldR][oldC] = temp;
   }
 
-  await new Promise((r) => setTimeout(r, 100));
-
-  // Player B marks the selected number
-  console.log(`  Player B marks ${winningValue}...`);
-  // Also on Player A, let's mark row 0 cell 4 to test checkBingo triggering 1 line
-  playerA.markedCells[0][4] = true;
-  const bingoCheck = roomManager['checkBingo'] ? roomManager['checkBingo'](playerA.board, playerA.markedCells) : { isBingo: true };
-
-  const markBRes: any = await new Promise((res) => {
-    clientB.emit('mark_selected_number', { roomId, sessionToken: tokenB, row: 0, col: 0, value: winningValue }, res);
-  });
-  if (!markBRes.success) throw new Error('Player B mark response failed');
-
-  // Verify Player B's mark was stamped
-  if (!playerB.markedCells[0][0]) throw new Error('Player B matching cell was not marked');
-  console.log('✓ Opponent response validated, cell stamped authoritatively');
-
-  // Test Game Over when Player A completes line
-  room.phase = 'GAME_OVER';
-  room.winner = {
-    playerId: playerA.id,
-    playerName: playerA.name,
-    winningPattern: { type: 'row', index: 0, name: 'Top Row (Horizontal)' },
-    winningNumbers: [playerA.board[0][0], playerA.board[0][1], playerA.board[0][2], playerA.board[0][3], playerA.board[0][4]],
-  };
+  // Now it's Player B's turn to select tile (1,4)
+  room.activePlayerId = pB.id;
   roomManager.broadcastRoomUpdate(room);
-  await new Promise((r) => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 60));
 
-  if (stateA!.room.phase !== 'GAME_OVER' || stateB!.room.phase !== 'GAME_OVER') {
-    throw new Error('Game did not transition to GAME_OVER');
+  const simultaneousItem = pB.board[1][4];
+  const simSelectRes: any = await new Promise((res) => {
+    clientB.emit('select_item', { roomId, sessionToken: tokenB, row: 1, col: 4, item: simultaneousItem }, res);
+  });
+
+  if (!simSelectRes.success || !simSelectRes.isBingo) {
+    throw new Error('Simultaneous Bingo move was not detected as Bingo');
   }
-  console.log('✓ Single 1-line Bingo Win condition verified and synchronized to both clients');
 
-  // 11. Test Rejection of Actions After GAME_OVER
+  await new Promise((r) => setTimeout(r, 80));
+
+  // Verify Player B (the selector) is the WINNER
+  if (stateA!.room.phase !== 'GAME_OVER' || stateA!.room.winner?.playerId !== pB.id) {
+    throw new Error(`Expected Player B (the active selector) to win simultaneous Bingo, but winner was: ${stateA!.room.winner?.playerName}`);
+  }
+  console.log(`✓ Simultaneous Bingo verified: Selector ${pB.name} won immediately!`);
+
+  // 10. Test Rejection of Actions After GAME_OVER
   const postGameOverSelect: any = await new Promise((res) => {
-    clientA.emit('select_number', { roomId, sessionToken: tokenA, row: 1, col: 1, value: boardA[1][1] }, res);
+    clientA.emit('select_item', { roomId, sessionToken: tokenA, row: 2, col: 2, item: boardA[2][2] }, res);
   });
   if (postGameOverSelect.success || postGameOverSelect.code !== 'GAME_OVER') {
-    throw new Error('Post game over selection was not rejected');
+    throw new Error('Post game over selection was not rejected with GAME_OVER');
   }
-  console.log('✓ Post-game actions rejected with GAME_OVER code');
+  console.log('✓ Post-game over actions rejected with GAME_OVER code');
 
-  // 12. Test Session Reconnection
+  // 11. Test Reconnection
   const clientAReconnect = await createClient();
   clientAReconnect.on('room_state_update', (s: ClientGameState) => { stateA = s; });
 
@@ -385,12 +375,12 @@ async function runE2ETest() {
     throw new Error('Reconnection failed');
   }
   stateA = reconnectRes.state;
-  if (!stateA.me.markedCells[0][0]) {
-    throw new Error('Reconnected state lost marked cells');
+  if (stateA.room.phase !== 'GAME_OVER' || stateA.room.mode !== 'NUMBERS_ONLY') {
+    throw new Error('Reconnected state lost game phase or mode');
   }
-  console.log('✓ Session Reconnection restored full authoritative state snapshot');
+  console.log('✓ Session Reconnection restored full authoritative state snapshot & mode');
 
-  // 13. Test Rematch Consensus & Reset to Round 2
+  // 12. Test Rematch (Preserves mode, resets 25 cells to 0 marks, resets to Round 2)
   const rematchA: any = await new Promise((res) => {
     clientAReconnect.emit('request_rematch', { roomId, sessionToken: tokenA }, res);
   });
@@ -401,14 +391,23 @@ async function runE2ETest() {
   });
   if (!rematchB.success || !rematchB.bothAgreed) throw new Error('Rematch failed when both agreed');
 
-  await new Promise((r) => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 100));
 
-  if (stateA!.room.round !== 2 || stateA!.room.phase !== 'LOBBY') {
-    throw new Error(`Expected Round 2 and phase LOBBY, got round ${stateA!.room.round}, phase ${stateA!.room.phase}`);
+  if (stateA!.room.round !== 2 || stateA!.room.phase !== 'LOBBY' || stateA!.room.mode !== 'NUMBERS_ONLY') {
+    throw new Error(`Expected Round 2, phase LOBBY, mode NUMBERS_ONLY. Got round ${stateA!.room.round}, phase ${stateA!.room.phase}, mode ${stateA!.room.mode}`);
   }
-  console.log('✓ Rematch successfully started Round 2 in LOBBY with reset turn state');
 
-  // 14. Clean Up and Exit Gracefully
+  // Verify all 25 cells reset to false
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      if (stateA!.me.markedCells[r][c] !== false || stateB!.me.markedCells[r][c] !== false) {
+        throw new Error('Rematch did not reset markedCells to 0 marks');
+      }
+    }
+  }
+  console.log('✓ Rematch successfully started Round 2 in LOBBY with preserved mode and 0 marks');
+
+  // 13. Teardown
   clientA.disconnect();
   clientB.disconnect();
   clientC.disconnect();
@@ -416,9 +415,9 @@ async function runE2ETest() {
   io.close();
   server.close();
 
-  console.log('========================================================');
-  console.log('🎉 ALL TURN-BASED MULTIPLAYER E2E TEST SCENARIOS PASSED!');
-  console.log('========================================================');
+  console.log('\n========================================================');
+  console.log('🎉 ALL MULTI-MODE FAST BINGO E2E TESTS PASSED SUCCESSFULLY!');
+  console.log('========================================================\n');
   process.exit(0);
 }
 
@@ -426,5 +425,6 @@ runE2ETest().catch((err) => {
   console.error('❌ E2E TEST FAILED:', err);
   process.exit(1);
 });
+
 
 

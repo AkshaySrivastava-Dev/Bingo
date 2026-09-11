@@ -18,9 +18,10 @@ export const App: React.FC = () => {
     removeToast,
     createRoom,
     joinRoom,
+    setGameMode,
     setReady,
     startCountdown,
-    markCell,
+    selectItem,
     requestRematch,
     leaveRoom,
   } = useSocket();
@@ -52,12 +53,13 @@ export const App: React.FC = () => {
             gameState={gameState}
             onSetReady={setReady}
             onStartCountdown={startCountdown}
+            onSetGameMode={setGameMode}
             onShowToast={addToast}
           />
         ) : (
           <GameRoom
             gameState={gameState}
-            onCellClick={markCell}
+            onCellClick={selectItem}
           />
         )}
       </main>
@@ -71,6 +73,7 @@ export const App: React.FC = () => {
       {phase === 'GAME_OVER' && gameState && (
         <WinnerModal
           winner={gameState.room.winner}
+          mode={gameState.room.mode}
           me={gameState.me}
           opponent={gameState.opponent}
           onRequestRematch={requestRematch}
@@ -85,3 +88,4 @@ export const App: React.FC = () => {
 };
 
 export default App;
+

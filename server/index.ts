@@ -148,7 +148,34 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  // 5. Start Countdown / Start Game
+  // 5. Set Game Mode (Host only in lobby)
+  socket.on(
+    'set_game_mode',
+    (data: { roomId: string; sessionToken: string; mode: any }, callback) => {
+      try {
+        const { roomId, sessionToken, mode } = data || {};
+        const result = roomManager.setGameMode(roomId, sessionToken, mode);
+
+        if (!result.success) {
+          if (typeof callback === 'function') {
+            callback({ success: false, code: result.errorCode, message: result.errorMessage });
+          }
+          return;
+        }
+
+        if (typeof callback === 'function') {
+          callback({ success: true });
+        }
+      } catch (err: any) {
+        console.error('Error setting game mode:', err);
+        if (typeof callback === 'function') {
+          callback({ success: false, code: 'INTERNAL_ERROR', message: 'Failed to set game mode.' });
+        }
+      }
+    }
+  );
+
+  // 6. Start Countdown / Start Game
   socket.on('start_countdown', (data: { roomId: string; sessionToken: string }, callback) => {
     try {
       const { roomId, sessionToken } = data || {};
@@ -172,51 +199,16 @@ io.on('connection', (socket: Socket) => {
     }
   });
 
-  // 6. Select Number (Player picking a number on their turn)
+  // 7. Select Item (Fast turn-based atomic move)
   socket.on(
-    'select_number',
+    'select_item',
     (
-      data: { roomId: string; sessionToken: string; row: number; col: number; value: number },
+      data: { roomId: string; sessionToken: string; row: number; col: number; item: any },
       callback
     ) => {
       try {
-        const { roomId, sessionToken, row, col, value } = data || {};
-        const result = roomManager.selectNumber(roomId, sessionToken, row, col, value);
-
-        if (!result.success) {
-          if (typeof callback === 'function') {
-            callback({ success: false, code: result.errorCode, message: result.errorMessage });
-          }
-          return;
-        }
-
-        if (typeof callback === 'function') {
-          callback({
-            success: true,
-            hasMatch: result.hasMatch,
-            pendingNumber: result.pendingNumber,
-            nextPlayerId: result.nextPlayerId,
-          });
-        }
-      } catch (err: any) {
-        console.error('Error selecting number:', err);
-        if (typeof callback === 'function') {
-          callback({ success: false, code: 'INTERNAL_ERROR', message: 'Failed to select number.' });
-        }
-      }
-    }
-  );
-
-  // 7. Mark Selected Number (Opponent responding and marking matching number)
-  socket.on(
-    'mark_selected_number',
-    (
-      data: { roomId: string; sessionToken: string; row: number; col: number; value: number },
-      callback
-    ) => {
-      try {
-        const { roomId, sessionToken, row, col, value } = data || {};
-        const result = roomManager.markSelectedNumber(roomId, sessionToken, row, col, value);
+        const { roomId, sessionToken, row, col, item } = data || {};
+        const result = roomManager.selectItem(roomId, sessionToken, row, col, item);
 
         if (!result.success) {
           if (typeof callback === 'function') {
@@ -230,15 +222,14 @@ io.on('connection', (socket: Socket) => {
             success: true,
             isBingo: result.isBingo,
             winner: result.winner,
-            markedCells: result.markedCells,
-            bestLineCount: result.bestLineCount,
-            completedLines: result.completedLines,
+            nextPlayerId: result.nextPlayerId,
+            moveRecord: result.moveRecord,
           });
         }
       } catch (err: any) {
-        console.error('Error marking selected number:', err);
+        console.error('Error selecting item:', err);
         if (typeof callback === 'function') {
-          callback({ success: false, code: 'INTERNAL_ERROR', message: 'Failed to mark selected number.' });
+          callback({ success: false, code: 'INTERNAL_ERROR', message: 'Failed to select item.' });
         }
       }
     }

@@ -1,85 +1,157 @@
-import { BingoBoard, MarkedGrid, WinningPattern } from './types.js';
+import { BingoBoard, BingoItem, GameMode, MarkedGrid, WinningPattern } from './types.js';
 
-// Helper to get random sample of k unique numbers from [min, max]
-function sampleUnique(min: number, max: number, count: number): number[] {
-  const pool: number[] = [];
-  for (let i = min; i <= max; i++) {
-    pool.push(i);
-  }
-  // Fisher-Yates partial shuffle
-  for (let i = pool.length - 1; i > 0; i--) {
+export const BINGO_WORDS: string[] = [
+  'APPLE', 'TIGER', 'ROCKET', 'OCEAN', 'MUSIC', 'SUN', 'MOON', 'FIRE', 'STAR', 'RIVER',
+  'MOUNTAIN', 'GUITAR', 'FLOWER', 'CASTLE', 'THUNDER', 'FOREST', 'DRAGON', 'CLOUD', 'CAMERA', 'PLANET',
+  'COFFEE', 'PIZZA', 'BICYCLE', 'DIAMOND', 'RAINBOW', 'EAGLE', 'ISLAND', 'WIZARD', 'VOLCANO', 'ROBOT',
+  'GALAXY', 'CROWN', 'BRIDGE', 'DESERT', 'PIRATE', 'PALACE', 'MAGNET', 'SHADOW', 'METEOR', 'JUNGLE',
+  'ANCHOR', 'CRYSTAL', 'FALCON', 'LIGHTNING', 'OCTOPUS', 'PENGUIN', 'SPIDER', 'TEMPLE', 'UNICORN', 'WHALE',
+  'ZEBRA', 'BUTTERFLY', 'DOLPHIN', 'HARBOR', 'KNIGHT', 'LANTERN', 'PHOENIX', 'SAFARI', 'TREASURE', 'VORTEX',
+  'BALLOON', 'CACTUS', 'COMPASS', 'FEATHER', 'GLACIER', 'HORIZON', 'IGLOO', 'JOURNEY', 'KANGAROO', 'LAGOON',
+  'MIRAGE', 'NEBULA', 'OASIS', 'PEACOCK', 'QUASAR', 'SAILBOAT', 'TORNADO', 'VOYAGE', 'WATERFALL', 'ZENITH'
+];
+
+// Helper to shuffle an array (Fisher-Yates)
+function shuffle<T>(array: T[]): T[] {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+    [result[i], result[j]] = [result[j], result[i]];
   }
-  return pool.slice(0, count);
+  return result;
+}
+
+// Helper to get random sample of k unique items
+function sampleUnique<T>(pool: T[], count: number): T[] {
+  return shuffle(pool).slice(0, count);
 }
 
 /**
- * Generate a standard 5x5 Bingo board:
- * B: 1-15 (5 numbers)
- * I: 16-30 (5 numbers)
- * N: 31-45 (4 numbers + 1 FREE at center)
- * G: 46-60 (5 numbers)
- * O: 61-75 (5 numbers)
+ * Generate a 5x5 Bingo board containing 25 unique items based on selected GameMode.
+ * NO FREE space. Every cell has a playable item.
  */
-export function generateBingoBoard(): BingoBoard {
-  const colB = sampleUnique(1, 15, 5);
-  const colI = sampleUnique(16, 30, 5);
-  const colN = sampleUnique(31, 45, 4); // 4 numbers, index 2 will be replaced by 0 (FREE)
-  const colG = sampleUnique(46, 60, 5);
-  const colO = sampleUnique(61, 75, 5);
+export function generateBingoBoard(mode: GameMode = 'NUMBERS_ONLY'): BingoBoard {
+  const board: BingoBoard = [];
 
-  const board: BingoBoard = [
-    [colB[0], colI[0], colN[0], colG[0], colO[0]],
-    [colB[1], colI[1], colN[1], colG[1], colO[1]],
-    [colB[2], colI[2], 0,         colG[2], colO[2]], // Center FREE space is 0
-    [colB[3], colI[3], colN[2], colG[3], colO[3]],
-    [colB[4], colI[4], colN[3], colG[4], colO[4]],
-  ];
+  if (mode === 'NUMBERS_ONLY') {
+    // Exactly numbers 1 to 25, all 25 unique, shuffled
+    const numbers = shuffle(Array.from({ length: 25 }, (_, i) => i + 1));
+    for (let r = 0; r < 5; r++) {
+      const row: BingoItem[] = [];
+      for (let c = 0; c < 5; c++) {
+        const num = numbers[r * 5 + c];
+        row.push({
+          id: `num_${num}`,
+          number: num,
+        });
+      }
+      board.push(row);
+    }
+  } else if (mode === 'WORDS_ONLY') {
+    // 25 unique words sampled from BINGO_WORDS
+    const words = sampleUnique(BINGO_WORDS, 25);
+    for (let r = 0; r < 5; r++) {
+      const row: BingoItem[] = [];
+      for (let c = 0; c < 5; c++) {
+        const word = words[r * 5 + c];
+        row.push({
+          id: `word_${word}`,
+          word,
+        });
+      }
+      board.push(row);
+    }
+  } else if (mode === 'NUMBERS_AND_WORDS') {
+    // 25 unique number-word pairs (numbers 1-25 paired with 25 unique words)
+    const numbers = shuffle(Array.from({ length: 25 }, (_, i) => i + 1));
+    const words = sampleUnique(BINGO_WORDS, 25);
+    for (let r = 0; r < 5; r++) {
+      const row: BingoItem[] = [];
+      for (let c = 0; c < 5; c++) {
+        const num = numbers[r * 5 + c];
+        const word = words[r * 5 + c];
+        row.push({
+          id: `pair_${num}_${word}`,
+          number: num,
+          word,
+        });
+      }
+      board.push(row);
+    }
+  }
 
   return board;
 }
 
 /**
- * Create initial 5x5 marked grid with center FREE space marked.
+ * Create initial 5x5 marked grid with ALL 25 cells unmarked.
+ * NO FREE SPACE.
  */
 export function createInitialMarkedGrid(): MarkedGrid {
-  const marked: MarkedGrid = Array(5)
+  return Array(5)
     .fill(null)
     .map(() => Array(5).fill(false));
-  marked[2][2] = true; // FREE space is pre-marked
-  return marked;
 }
 
 /**
- * Shuffles 1..75 pool for authoritative game calling.
+ * Checks equality between two BingoItems based on the active GameMode.
  */
-export function shuffleNumberPool(): number[] {
-  const pool: number[] = [];
-  for (let i = 1; i <= 75; i++) {
-    pool.push(i);
+export function areItemsEqual(a: BingoItem, b: BingoItem, mode: GameMode): boolean {
+  if (mode === 'NUMBERS_ONLY') {
+    return a.number !== undefined && b.number !== undefined && a.number === b.number;
   }
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+  if (mode === 'WORDS_ONLY') {
+    return a.word !== undefined && b.word !== undefined && a.word === b.word;
   }
-  return pool;
+  if (mode === 'NUMBERS_AND_WORDS') {
+    return (
+      a.number !== undefined &&
+      b.number !== undefined &&
+      a.number === b.number &&
+      a.word !== undefined &&
+      b.word !== undefined &&
+      a.word === b.word
+    );
+  }
+  return false;
 }
 
 /**
- * Get Bingo column letter for a number 1-75
+ * Searches for a matching item on a 5x5 Bingo board and returns its (row, col) coordinates or null.
  */
-export function getNumberLetter(num: number): string {
-  if (num >= 1 && num <= 15) return 'B';
-  if (num >= 16 && num <= 30) return 'I';
-  if (num >= 31 && num <= 45) return 'N';
-  if (num >= 46 && num <= 60) return 'G';
-  if (num >= 61 && num <= 75) return 'O';
+export function findItemOnBoard(
+  board: BingoBoard,
+  target: BingoItem,
+  mode: GameMode
+): { row: number; col: number } | null {
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {
+      if (areItemsEqual(board[r][c], target, mode)) {
+        return { row: r, col: c };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Formats a BingoItem into a readable string representation according to the GameMode.
+ */
+export function formatItemLabel(item: BingoItem, mode: GameMode): string {
+  if (mode === 'NUMBERS_ONLY') {
+    return item.number !== undefined ? `${item.number}` : '';
+  }
+  if (mode === 'WORDS_ONLY') {
+    return item.word || '';
+  }
+  if (mode === 'NUMBERS_AND_WORDS') {
+    return `${item.number || ''} ${item.word || ''}`.trim();
+  }
   return '';
 }
 
 /**
- * Calculates line statistics for progress reporting
+ * Calculates line statistics for progress reporting (0-5).
  */
 export function calculateProgress(marked: MarkedGrid): { bestLineCount: number; completedLines: number } {
   let maxLine = 0;
@@ -128,7 +200,7 @@ export function calculateProgress(marked: MarkedGrid): { bestLineCount: number; 
 }
 
 /**
- * Checks if the board has achieved a valid Bingo line (Row, Column, or Diagonal).
+ * Checks if the board has achieved a valid Bingo line of 5 marked cells (Row, Column, or Diagonal).
  * Returns the winning pattern with coordinates if true, null otherwise.
  */
 export function checkBingo(marked: MarkedGrid): WinningPattern | null {
@@ -216,23 +288,10 @@ export function checkBingo(marked: MarkedGrid): WinningPattern | null {
 }
 
 /**
- * Extracts the values on the board corresponding to a winning pattern
+ * Extracts the items on the board corresponding to a winning pattern.
  */
-export function getWinningNumbers(board: BingoBoard, pattern: WinningPattern): number[] {
+export function getWinningItems(board: BingoBoard, pattern: WinningPattern): BingoItem[] {
   return pattern.coordinates.map(([r, c]) => board[r][c]);
 }
 
-/**
- * Searches for a number on a 5x5 Bingo board and returns its (row, col) coordinates or null if not present.
- */
-export function findNumberOnBoard(board: BingoBoard, targetNum: number): { row: number; col: number } | null {
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {
-      if (board[r][c] === targetNum) {
-        return { row: r, col: c };
-      }
-    }
-  }
-  return null;
-}
 

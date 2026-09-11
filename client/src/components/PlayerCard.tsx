@@ -1,6 +1,5 @@
 import React from 'react';
 import { Crown, WifiOff, CheckCircle2, Clock, Sparkles } from 'lucide-react';
-import type { TurnState } from '../types/game';
 
 interface PlayerCardProps {
   name: string;
@@ -13,8 +12,6 @@ interface PlayerCardProps {
   isMe?: boolean;
   phase: string;
   isPlayerTurn?: boolean;
-  turnState?: TurnState;
-  isPendingResponder?: boolean;
 }
 
 export const PlayerCard: React.FC<PlayerCardProps> = ({
@@ -28,8 +25,6 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
   isMe = false,
   phase,
   isPlayerTurn = false,
-  turnState,
-  isPendingResponder = false,
 }) => {
   const initials = name
     .split(' ')
@@ -86,7 +81,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           {isPlaying && isPlayerTurn && (
             <span className="inline-flex items-center gap-1 text-[9px] font-black px-1.5 py-0.2 rounded-md bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40 uppercase tracking-widest animate-pulse">
               <Sparkles className="w-2.5 h-2.5" />
-              {turnState === 'SELECTING' ? 'PICKING' : isPendingResponder ? 'STAMPING' : 'ACTIVE'}
+              TURN
             </span>
           )}
           {completedLines > 0 && isPlaying && (
@@ -101,7 +96,7 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           <div className="space-y-1">
             <div className="flex items-center justify-between text-xs font-bold">
               <span className="text-[#A8A296] text-[10px] uppercase tracking-wider">
-                Line Progress
+                Best Line Progress
               </span>
               <span className="text-[#F59E0B] font-mono text-[11px] font-black">
                 {bestLineCount}/5 {bestLineCount === 4 ? '🔥 1 AWAY!' : bestLineCount === 5 ? '🏆 BINGO!' : ''}
@@ -149,4 +144,5 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
     </div>
   );
 };
+
 

@@ -220,6 +220,28 @@ export function useSocket() {
     [addToast]
   );
 
+  // Host Action: Set Game Mode in Lobby
+  const setGameMode = useCallback(
+    (mode: ClientGameState['room']['mode']) => {
+      if (!socketRef.current || !gameState) return;
+      socketRef.current.emit(
+        'set_game_mode',
+        {
+          roomId: gameState.room.id,
+          sessionToken: gameState.me.sessionToken,
+          mode,
+        },
+        (res: { success: boolean; code?: string; message?: string }) => {
+          if (!res.success) {
+            sound.playError();
+            addToast(res.message || 'Failed to set game mode.', 'error');
+          }
+        }
+      );
+    },
+    [gameState, addToast]
+  );
+
   const setReady = useCallback(
     (isReady: boolean) => {
       if (!socketRef.current || !gameState) return;
@@ -258,81 +280,36 @@ export function useSocket() {
     );
   }, [gameState, addToast]);
 
-  // Turn Action 1: Select a number on your turn
-  const selectNumber = useCallback(
-    (row: number, col: number, value: number) => {
+  // Fast Turn Action: Select an item on your turn (immediately marks & auto-marks opponent)
+  const selectItem = useCallback(
+    (row: number, col: number, item: ClientGameState['me']['board'][0][0]) => {
       if (!socketRef.current || !gameState) return;
       if (gameState.room.phase !== 'PLAYING') return;
+      if (!gameState.room.isMyTurn) return;
 
       socketRef.current.emit(
-        'select_number',
+        'select_item',
         {
           roomId: gameState.room.id,
           sessionToken: gameState.me.sessionToken,
           row,
           col,
-          value,
-        },
-        (res: { success: boolean; hasMatch?: boolean; code?: string; message?: string }) => {
-          if (res.success) {
-            sound.playNumberCalled();
-            if (res.hasMatch) {
-              addToast(`You selected ${value}! Waiting for opponent to check...`, 'info');
-            } else {
-              addToast(`You selected ${value}. Opponent does not have it! Turn passed.`, 'info');
-            }
-          } else {
-            sound.playError();
-            if (res.message) {
-              addToast(res.message, 'warning');
-            }
-          }
-        }
-      );
-    },
-    [gameState, addToast]
-  );
-
-  // Turn Action 2: Opponent responds to the selected number
-  const markSelectedNumber = useCallback(
-    (row: number, col: number, value: number) => {
-      if (!socketRef.current || !gameState) return;
-      if (gameState.room.phase !== 'PLAYING') return;
-
-      socketRef.current.emit(
-        'mark_selected_number',
-        {
-          roomId: gameState.room.id,
-          sessionToken: gameState.me.sessionToken,
-          row,
-          col,
-          value,
+          item,
         },
         (res: {
           success: boolean;
           isBingo?: boolean;
-          markedCells?: boolean[][];
-          bestLineCount?: number;
-          completedLines?: number;
+          winner?: any;
+          nextPlayerId?: string;
+          moveRecord?: any;
           code?: string;
           message?: string;
         }) => {
-          if (res.success && res.markedCells) {
+          if (res.success) {
             sound.playCellMarked();
-            setGameState((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                me: {
-                  ...prev.me,
-                  markedCells: res.markedCells!,
-                  bestLineCount: res.bestLineCount ?? prev.me.bestLineCount,
-                  completedLines: res.completedLines ?? prev.me.completedLines,
-                  hasBingo: res.isBingo ?? prev.me.hasBingo,
-                },
-              };
-            });
-            addToast(`Stamped ${value}! Now it's your turn to choose.`, 'success');
+            if (res.moveRecord?.markedOnOpponent) {
+              addToast('Marked on both boards!', 'success');
+            }
           } else {
             sound.playError();
             if (res.message) {
@@ -343,20 +320,6 @@ export function useSocket() {
       );
     },
     [gameState, addToast]
-  );
-
-  // Smart cell handler that automatically picks between selectNumber and markSelectedNumber
-  const markCell = useCallback(
-    (row: number, col: number, value: number) => {
-      if (!gameState || gameState.room.phase !== 'PLAYING') return;
-
-      if (gameState.room.isPendingResponder && gameState.room.turnState === 'WAITING_FOR_RESPONSE') {
-        markSelectedNumber(row, col, value);
-      } else if (gameState.room.isMyTurn && gameState.room.turnState === 'SELECTING') {
-        selectNumber(row, col, value);
-      }
-    },
-    [gameState, markSelectedNumber, selectNumber]
   );
 
   const requestRematch = useCallback(() => {
@@ -411,11 +374,10 @@ export function useSocket() {
     removeToast,
     createRoom,
     joinRoom,
+    setGameMode,
     setReady,
     startCountdown,
-    selectNumber,
-    markSelectedNumber,
-    markCell,
+    selectItem,
     requestRematch,
     leaveRoom,
   };
